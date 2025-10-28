@@ -60,12 +60,15 @@ local function load_marks()
 			local ok, decoded = pcall(vim.json.decode, table.concat(content, "\n"))
 			if ok and decoded then
 				marks = decoded
+				return marks
 			else
 				marks = {}
+				return marks
 			end
 		end
 	else
 		marks = {}
+		return marks
 	end
 end
 
@@ -427,80 +430,6 @@ function M.show_marks()
 	end
 end
 
-function M.telescope_marks()
-	local ok, telescope = pcall(require, "telescope")
-	if not ok then
-		M.show_marks()
-		return
-	end
-
-	load_marks()
-
-	if vim.tbl_isempty(marks) then
-		vim.notify("No marks in current project", vim.log.levels.INFO)
-		return
-	end
-
-	local pickers = require("telescope.pickers")
-	local finders = require("telescope.finders")
-	local conf = require("telescope.config").values
-	local actions = require("telescope.actions")
-	local action_state = require("telescope.actions.state")
-
-	local entries = {}
-	for name, mark in pairs(marks) do
-		table.insert(entries, {
-			value = name,
-			display = name .. " - " .. vim.fn.fnamemodify(mark.file, ":~:.") .. ":" .. mark.line,
-			ordinal = name .. " " .. mark.file .. " " .. (mark.text or ""),
-			filename = mark.file,
-			lnum = mark.line,
-			col = mark.col,
-			text = mark.text,
-		})
-	end
-
-	table.sort(entries, function(a, b)
-		local mark_a = marks[a.value]
-		local mark_b = marks[b.value]
-		return (mark_a.created_at or 0) > (mark_b.created_at or 0)
-	end)
-
-	pickers
-		.new({}, {
-			prompt_title = "Project Marks",
-			finder = finders.new_table({
-				results = entries,
-				entry_maker = function(entry)
-					return entry
-				end,
-			}),
-			sorter = conf.generic_sorter({}),
-			previewer = conf.grep_previewer({}),
-			attach_mappings = function(prompt_bufnr)
-				actions.select_default:replace(function()
-					actions.close(prompt_bufnr)
-					local selection = action_state.get_selected_entry()
-					if selection then
-						M.goto_mark(selection.value)
-					end
-				end)
-
-				actions.delete_buffer:replace(function()
-					local selection = action_state.get_selected_entry()
-					if selection then
-						M.delete_mark(selection.value)
-						actions.close(prompt_bufnr)
-						M.telescope_marks()
-					end
-				end)
-
-				return true
-			end,
-		})
-		:find()
-end
-
 function M.get_marks_count()
 	load_marks()
 	return vim.tbl_count(marks)
@@ -604,7 +533,6 @@ local function init()
 
 	vim.api.nvim_create_user_command("MarkList", M.show_marks, {})
 	vim.api.nvim_create_user_command("MarkClear", M.clear_all_marks, {})
-	vim.api.nvim_create_user_command("MarkTelescope", M.telescope_marks, {})
 	vim.api.nvim_create_user_command("MarkExport", M.export_marks, {})
 	vim.api.nvim_create_user_command("MarkImport", M.import_marks, {})
 
@@ -632,6 +560,9 @@ local function init()
 	setup_highlights()
 end
 
+function M.get_marks()
+	return marks
+end
 function M.setup(opts)
 	config = vim.tbl_deep_extend("force", config, opts or {})
 	init()

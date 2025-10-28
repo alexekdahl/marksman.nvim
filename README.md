@@ -5,7 +5,7 @@
 <h1 align="center">Marksman.nvim</h1>
 
 <p align="center">
-  A project-scoped bookmark manager for Neovim with beautiful UI and Telescope integration.
+  A project-scoped bookmark manager for Neovim with beautiful UI.
 </p>
 
 ## Installation
@@ -26,7 +26,7 @@
 	},
 	cmd = {
 		"MarkAdd", "MarkGoto", "MarkDelete", "MarkRename",
-		"MarkList", "MarkClear", "MarkTelescope",
+		"MarkList", "MarkClear",
 		"MarkExport", "MarkImport",
 	},
 	opts = {
@@ -105,7 +105,6 @@ Default configuration:
 | `:MarkRename <old> <new>` | Rename a mark |
 | `:MarkList` | Show all marks in floating window |
 | `:MarkClear` | Clear all marks (with confirmation) |
-| `:MarkTelescope` | Open marks in Telescope |
 | `:MarkExport` | Export marks to JSON file |
 | `:MarkImport` | Import marks from JSON file |
 
@@ -116,7 +115,6 @@ Default configuration:
 - **Beautiful UI**: Floating window with syntax highlighting
 - **File icons**: Automatic file type icons
 - **Quick navigation**: Number keys (1-9) for instant jumping
-- **Telescope integration**: Browse marks with preview
 - **Import/Export**: Share marks across machines
 - **Persistent**: Marks survive Neovim restarts
 
@@ -156,14 +154,6 @@ Use the quick goto keymaps to jump to your most recent marks:
 - `<M-i>`: Jump to mark #3
 - `<M-o>`: Jump to mark #4
 
-### Telescope Integration
-
-```vim
-:MarkTelescope
-```
-
-Use Telescope's fuzzy finder to search through your marks with live preview.
-
 ## API
 
 ```lua
@@ -194,9 +184,6 @@ marksman.clear_all_marks()
 -- Export/Import
 marksman.export_marks()
 marksman.import_marks()
-
--- Telescope integration
-marksman.telescope_marks()
 ```
 
 ## License
