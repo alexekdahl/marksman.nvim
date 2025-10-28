@@ -1,6 +1,12 @@
-# Marksman.nvim
+<p align="center">
+  <img src="assets/marksman.png" alt="marksman.nvim logo" width="420"/>
+</p>
 
-A project-scoped bookmark manager for Neovim with beautiful UI and Telescope integration.
+<h1 align="center">Marksman.nvim</h1>
+
+<p align="center">
+  A project-scoped bookmark manager for Neovim with beautiful UI and Telescope integration.
+</p>
 
 ## Installation
 
@@ -193,16 +199,5 @@ marksman.import_marks()
 marksman.telescope_marks()
 ```
 
-## Tips
-
-1. **Auto-naming**: Leave the name empty when adding marks - the plugin will generate meaningful names based on the code context (function names, class names, etc.)
-
-2. **Quick marks**: Use the numbered quick access keys (`<M-y>`, `<M-u>`, etc.) for frequently used marks
-
-3. **Organization**: Rename marks to meaningful names for better organization
-
-4. **Backup**: Use `:MarkExport` to backup your marks before major changes
-
 ## License
-
 MIT
