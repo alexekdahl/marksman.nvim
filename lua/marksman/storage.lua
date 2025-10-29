@@ -187,14 +187,26 @@ function M.get_sorted_mark_names()
 		table.insert(mark_names, name)
 	end
 
-	table.sort(mark_names, function(a, b)
-		local mark_a = marks_data[a]
-		local mark_b = marks_data[b]
-		-- Sort by access time first, then creation time
-		local time_a = mark_a.accessed_at or mark_a.created_at or 0
-		local time_b = mark_b.accessed_at or mark_b.created_at or 0
-		return time_a > time_b
-	end)
+	-- Only sort if sorting is enabled
+	if config.sort_marks then
+		table.sort(mark_names, function(a, b)
+			local mark_a = marks_data[a]
+			local mark_b = marks_data[b]
+			-- Sort by access time first, then creation time
+			local time_a = mark_a.accessed_at or mark_a.created_at or 0
+			local time_b = mark_b.accessed_at or mark_b.created_at or 0
+			return time_a > time_b
+		end)
+	else
+		-- When sorting is disabled, maintain insertion order by sorting by creation time ascending
+		table.sort(mark_names, function(a, b)
+			local mark_a = marks_data[a]
+			local mark_b = marks_data[b]
+			local time_a = mark_a.created_at or 0
+			local time_b = mark_b.created_at or 0
+			return time_a < time_b -- Ascending for insertion order
+		end)
+	end
 
 	return mark_names
 end

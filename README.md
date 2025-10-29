@@ -60,6 +60,7 @@ Vim's built-in marks are great, but they're global and get messy fast. Marksman 
     enable_descriptions = true,
     search_in_ui = true,
     undo_levels = 10,
+    sort_marks = true,  -- Set to false to keep insertion order
   },
 }
 ```
@@ -349,7 +350,27 @@ storage.get_project_name()    -- Get current project name
 | `enable_descriptions` | boolean | `true` | Enable mark descriptions |
 | `search_in_ui` | boolean | `true` | Enable search in UI |
 | `undo_levels` | number | `10` | Number of deletions to remember |
+| `sort_marks` | boolean | `true` | Sort marks by access time (false = insertion order) |
 | `highlights` | table | `{...}` | Custom highlight groups |
+
+### Sorting Behavior
+By default (`sort_marks = true`), marks are sorted by:
+1. **Access time** (when you last jumped to the mark)
+2. **Creation time** (when the mark was created)
+
+This means recently used marks appear first, making them easier to access.
+
+When `sort_marks = false`:
+- Marks maintain their **insertion order** (oldest marks first)
+- Quick access keys (`goto_1`, `goto_2`, etc.) will jump to marks in the order they were created
+- Useful if you prefer predictable, stable ordering
+
+```lua
+-- Example: Disable sorting to keep insertion order
+require("marksman").setup({
+  sort_marks = false,  -- Marks stay in creation order
+})
+```
 
 ## How it works
 

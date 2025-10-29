@@ -32,6 +32,7 @@ local default_config = {
 	enable_descriptions = true,
 	search_in_ui = true,
 	undo_levels = 10,
+	sort_marks = true,
 }
 
 local config = {}

@@ -113,13 +113,25 @@ local function create_marks_content(marks, search_query)
 		table.insert(mark_names, name)
 	end
 
-	table.sort(mark_names, function(a, b)
-		local mark_a = filtered_marks[a]
-		local mark_b = filtered_marks[b]
-		local time_a = mark_a.accessed_at or mark_a.created_at or 0
-		local time_b = mark_b.accessed_at or mark_b.created_at or 0
-		return time_a > time_b
-	end)
+	-- Only sort if sorting is enabled in config
+	if config.sort_marks then
+		table.sort(mark_names, function(a, b)
+			local mark_a = filtered_marks[a]
+			local mark_b = filtered_marks[b]
+			local time_a = mark_a.accessed_at or mark_a.created_at or 0
+			local time_b = mark_b.accessed_at or mark_b.created_at or 0
+			return time_a > time_b
+		end)
+	else
+		-- When sorting is disabled, maintain insertion order (oldest first)
+		table.sort(mark_names, function(a, b)
+			local mark_a = filtered_marks[a]
+			local mark_b = filtered_marks[b]
+			local time_a = mark_a.created_at or 0
+			local time_b = mark_b.created_at or 0
+			return time_a < time_b
+		end)
+	end
 
 	-- Header
 	local title = search_query
