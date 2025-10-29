@@ -8,35 +8,34 @@
   A project-scoped bookmark manager for Neovim with beautiful UI.
 </p>
 
+# marksman.nvim
+
+A simple and fast bookmark management plugin for Neovim.
+
+## Features
+
+- **Fast bookmarks**: Quickly set and jump to marks across your project
+- **Project-aware**: Automatically organizes marks by project/directory
+- **Simple workflow**: Set marks with one key, jump with another
+
+## Requirements
+
+- Neovim >= 0.8.0
+- (Optional) [telescope.nvim](https://github.com/nvim-telescope/telescope.nvim) for fuzzy finding
+- (Optional) [snacks.nvim](https://github.com/folke/snacks.nvim) for modern picker interface
+
 ## Installation
 
-### Using lazy.nvim
+### lazy.nvim
 
 ```lua
 {
-	"alexekdahl/marksman.nvim",
-	event = "VeryLazy",
-	keys = {
-		{ "<C-a>", function() require("marksman").add_mark() end, desc = "Add mark" },
-		{ "<C-e>", function() require("marksman").show_marks() end, desc = "Show marks" },
-		{ "<M-y>", function() require("marksman").goto_mark(1) end, desc = "Go to mark 1" },
-		{ "<M-u>", function() require("marksman").goto_mark(2) end, desc = "Go to mark 2" },
-		{ "<M-i>", function() require("marksman").goto_mark(3) end, desc = "Go to mark 3" },
-		{ "<M-o>", function() require("marksman").goto_mark(4) end, desc = "Go to mark 4" },
-	},
-	cmd = {
-		"MarkAdd", "MarkGoto", "MarkDelete", "MarkRename",
-		"MarkList", "MarkClear",
-		"MarkExport", "MarkImport",
-	},
-	opts = {
-		-- Configuration goes here
-	},
+  "alexekdahl/marksman.nvim",
+    opts = {},
 }
 ```
 
 ## Configuration
-
 Default configuration:
 
 ```lua
@@ -83,108 +82,185 @@ Default configuration:
 	},
 }
 ```
+## Basic Usage
 
-### Disable Keymaps
+## Telescope Integration
+
+Add this function to your config to search marks with Telescope:
 
 ```lua
-{
-	"alexekdahl/marksman.nvim",
-	opts = {
-		keymaps = false, -- Disable all default keymaps
-	},
+local function telescope_marksman()
+  local ok, marksman = pcall(require, "marksman")
+  if not ok then
+    return
+  end
+  
+  local ok, _ = pcall(require, "telescope")
+  if not ok then
+    marksman.show_marks()
+    return
+  end
+  
+  local marks = marksman.get_marks()
+  if vim.tbl_isempty(marks) then
+    vim.notify("No marks in current project", vim.log.levels.INFO)
+    return
+  end
+  
+  local pickers = require("telescope.pickers")
+  local finders = require("telescope.finders")
+  local conf = require("telescope.config").values
+  local actions = require("telescope.actions")
+  local action_state = require("telescope.actions.state")
+  
+  local entries = {}
+  for name, mark in pairs(marks) do
+    table.insert(entries, {
+      value = name,
+      display = name .. " - " .. vim.fn.fnamemodify(mark.file, ":~:.") .. ":" .. mark.line,
+      ordinal = name .. " " .. mark.file .. " " .. (mark.text or ""),
+      filename = mark.file,
+      lnum = mark.line,
+      col = mark.col,
+      text = mark.text,
+    })
+  end
+  
+  -- Sort by creation time (newest first)
+  table.sort(entries, function(a, b)
+    local mark_a = marks[a.value]
+    local mark_b = marks[b.value]
+    return (mark_a.created_at or 0) > (mark_b.created_at or 0)
+  end)
+  
+  pickers.new({}, {
+    prompt_title = "Project Marks",
+    finder = finders.new_table({
+      results = entries,
+      entry_maker = function(entry)
+        return entry
+      end,
+    }),
+    sorter = conf.generic_sorter({}),
+    previewer = conf.grep_previewer({}),
+    attach_mappings = function(prompt_bufnr)
+      actions.select_default:replace(function()
+        actions.close(prompt_bufnr)
+        local selection = action_state.get_selected_entry()
+        if selection then
+          marksman.goto_mark(selection.value)
+        end
+      end)
+      return true
+    end,
+  }):find()
+end
+
+-- Bind to a key
+vim.keymap.set("n", "<leader>fm", telescope_marksman, { desc = "Find marks" })
+```
+
+## Snacks.nvim Integration
+
+If you're using snacks.nvim, you can create a custom picker:
+```lua
+function M.snacks_marksman()
+	local ok, marksman = pcall(require, "marksman")
+	if not ok then
+		return {}
+	end
+
+	local marks = marksman.get_marks()
+	if vim.tbl_isempty(marks) then
+		return {}
+	end
+
+	local results = {}
+	for name, mark in pairs(marks) do
+		local entry = {
+			text = name,
+			file = mark.file,
+			pos = { tonumber(mark.line) or 1, tonumber(mark.col) or 1 },
+			display = string.format("%s %s:%d", name, vim.fn.fnamemodify(mark.file, ":~:."), tonumber(mark.line) or 1),
+			ordinal = name .. " " .. vim.fn.fnamemodify(mark.file, ":t"),
+			mark_name = name,
+		}
+		table.insert(results, entry)
+	end
+
+	-- Sort by creation time (newest first)
+	table.sort(results, function(a, b)
+		local mark_a = marks[a.mark_name]
+		local mark_b = marks[b.mark_name]
+		return (mark_a.created_at or 0) > (mark_b.created_at or 0)
+	end)
+
+	return results
+end
+
+```
+
+
+
+```lua
+-- snacks integration
+picker = {
+    sources = {
+        marksman = {
+            name = "Marksman Marks",
+            finder = cmd.snack_marksman,
+            confirm = function(item)
+                if item and item.mark_name then
+                    require("marksman").goto_mark(item.mark_name)
+                end
+            end,
+        },
+    },
 }
-```
 
-## Commands
-
-| Command | Description |
-|---------|-------------|
-| `:MarkAdd [name]` | Add a mark at current cursor position |
-| `:MarkGoto [name]` | Go to a mark (shows list if no name provided) |
-| `:MarkDelete [name]` | Delete a mark (clears all if no name provided) |
-| `:MarkRename <old> <new>` | Rename a mark |
-| `:MarkList` | Show all marks in floating window |
-| `:MarkClear` | Clear all marks (with confirmation) |
-| `:MarkExport` | Export marks to JSON file |
-| `:MarkImport` | Import marks from JSON file |
-
-## Features
-
-- **Project-scoped**: Marks are stored per-project (based on git root)
-- **Smart naming**: Auto-generates meaningful names from context
-- **Beautiful UI**: Floating window with syntax highlighting
-- **File icons**: Automatic file type icons
-- **Quick navigation**: Number keys (1-9) for instant jumping
-- **Import/Export**: Share marks across machines
-- **Persistent**: Marks survive Neovim restarts
-
-## Usage
-
-### Adding Marks
-
-```vim
-" Add mark with auto-generated name
-:MarkAdd
-
-" Add mark with custom name
-:MarkAdd important_function
-```
-
-Or use the keymap: `<C-a>` (default)
-
-### Viewing Marks
-
-```vim
-:MarkList
-```
-
-Or use the keymap: `<C-e>` (default)
-
-In the marks window:
-- `<CR>` or `1-9`: Jump to mark
-- `d`: Delete mark
-- `r`: Rename mark
-- `q` or `<Esc>`: Close window
-
-### Quick Access
-
-Use the quick goto keymaps to jump to your most recent marks:
-- `<M-y>`: Jump to mark #1
-- `<M-u>`: Jump to mark #2
-- `<M-i>`: Jump to mark #3
-- `<M-o>`: Jump to mark #4
 
 ## API
-
 ```lua
-local marksman = require("marksman.nvim")
-
+local marksman = require("marksman")
 -- Add a mark
 marksman.add_mark("my_mark")
-
 -- Go to a mark
 marksman.goto_mark("my_mark")
 marksman.goto_mark(1)  -- Jump to first mark
-
 -- Delete a mark
 marksman.delete_mark("my_mark")
-
 -- Rename a mark
 marksman.rename_mark("old_name", "new_name")
-
 -- Show marks UI
 marksman.show_marks()
-
 -- Get marks count
 local count = marksman.get_marks_count()
-
 -- Clear all marks
 marksman.clear_all_marks()
-
 -- Export/Import
 marksman.export_marks()
 marksman.import_marks()
 ```
 
+## FAQ
+
+**Q: How are marks stored?**
+A: Marks are stored per-project in ~/.local/share/nvim/marksman_[hash].json where the hash is generated from the project path.
+
+**Q: Can I share marks between team members?**
+A: Currently marks are local to your machine. Project-wide mark sharing is planned for a future release.
+
+**Q: What happens to marks when files are deleted?**
+A: Marksman automatically warns when marks pointing to non-existent files when you load the marks.
+
+## Contributing
+
+1. Fork the repository
+2. Create a feature branch
+3. Make your changes
+4. Add tests if applicable
+5. Submit a pull request
+
 ## License
-MIT
+
+MIT License - see LICENSE file for details.

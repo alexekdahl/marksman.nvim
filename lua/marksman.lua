@@ -1,3 +1,4 @@
+-- luacheck: globals vim
 local M = {}
 
 -- State
@@ -492,14 +493,12 @@ function M.import_marks()
 	end
 end
 
--- Setup
-local initialized = false
+function M.get_marks()
+	return marks
+end
 
-local function init()
-	if initialized then
-		return
-	end
-	initialized = true
+function M.setup(opts)
+	config = vim.tbl_deep_extend("force", config, opts or {})
 
 	-- User commands
 	vim.api.nvim_create_user_command("MarkAdd", function(args)
@@ -558,14 +557,6 @@ local function init()
 	end
 
 	setup_highlights()
-end
-
-function M.get_marks()
-	return marks
-end
-function M.setup(opts)
-	config = vim.tbl_deep_extend("force", config, opts or {})
-	init()
 end
 
 return M
