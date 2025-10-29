@@ -7,6 +7,13 @@ local current_project = nil
 local config = {}
 local deletion_history = {}
 
+-- Helper function for conditional notifications
+local function notify(message, level)
+	if not config.silent then
+		vim.notify(message, level)
+	end
+end
+
 -- Initialize deletion history as a circular buffer
 local function init_deletion_history()
 	deletion_history = {
@@ -81,7 +88,7 @@ local function backup_marks_file()
 		end)
 
 		if not ok then
-			vim.notify("Failed to create backup: " .. tostring(err), vim.log.levels.WARN)
+			notify("Failed to create backup: " .. tostring(err), vim.log.levels.WARN)
 		end
 	end
 end
@@ -106,7 +113,7 @@ local function load_marks()
 		end)
 
 		if not ok then
-			vim.notify("Error loading marks: " .. tostring(err), vim.log.levels.ERROR)
+			notify("Error loading marks: " .. tostring(err), vim.log.levels.ERROR)
 			marks = {}
 		end
 	else
@@ -133,7 +140,7 @@ local function save_marks()
 	end)
 
 	if not ok then
-		vim.notify("Failed to save marks: " .. tostring(err), vim.log.levels.ERROR)
+		notify("Failed to save marks: " .. tostring(err), vim.log.levels.ERROR)
 		return false
 	end
 
@@ -318,7 +325,7 @@ function M.export_marks()
 	local marks_data = M.get_marks()
 
 	if vim.tbl_isempty(marks_data) then
-		vim.notify("No marks to export", vim.log.levels.INFO)
+		notify("No marks to export", vim.log.levels.INFO)
 		return false
 	end
 
@@ -342,16 +349,16 @@ function M.export_marks()
 				end)
 
 				if success then
-					vim.notify("󰃀 Marks exported to " .. filename, vim.log.levels.INFO)
+					notify("󰃀 Marks exported to " .. filename, vim.log.levels.INFO)
 					return true
 				else
-					vim.notify("Export failed: " .. tostring(err), vim.log.levels.ERROR)
+					notify("Export failed: " .. tostring(err), vim.log.levels.ERROR)
 					return false
 				end
 			end
 		end)
 	else
-		vim.notify("Failed to encode marks for export", vim.log.levels.ERROR)
+		notify("Failed to encode marks for export", vim.log.levels.ERROR)
 		return false
 	end
 end
@@ -367,7 +374,7 @@ function M.import_marks()
 		end
 
 		if vim.fn.filereadable(filename) == 0 then
-			vim.notify("File not found: " .. filename, vim.log.levels.WARN)
+			notify("File not found: " .. filename, vim.log.levels.WARN)
 			return
 		end
 
@@ -391,19 +398,19 @@ function M.import_marks()
 						end
 
 						if save_marks() then
-							vim.notify("󰃀 Marks imported successfully", vim.log.levels.INFO)
+							notify("󰃀 Marks imported successfully", vim.log.levels.INFO)
 						else
-							vim.notify("Failed to save imported marks", vim.log.levels.ERROR)
+							notify("Failed to save imported marks", vim.log.levels.ERROR)
 						end
 					end)
 				else
-					vim.notify("Invalid marks file format", vim.log.levels.ERROR)
+					notify("Invalid marks file format", vim.log.levels.ERROR)
 				end
 			end
 		end)
 
 		if not ok then
-			vim.notify("Import failed: " .. tostring(err), vim.log.levels.ERROR)
+			notify("Import failed: " .. tostring(err), vim.log.levels.ERROR)
 		end
 	end)
 end
@@ -426,13 +433,13 @@ function M.validate_marks()
 				for _, name in ipairs(invalid_marks) do
 					M.delete_mark(name)
 				end
-				vim.notify(string.format("Removed %d invalid marks", #invalid_marks), vim.log.levels.INFO)
+				notify(string.format("Removed %d invalid marks", #invalid_marks), vim.log.levels.INFO)
 			elseif choice == "Show" then
-				vim.notify("Invalid marks: " .. table.concat(invalid_marks, ", "), vim.log.levels.INFO)
+				notify("Invalid marks: " .. table.concat(invalid_marks, ", "), vim.log.levels.INFO)
 			end
 		end)
 	else
-		vim.notify("All marks are valid", vim.log.levels.INFO)
+		notify("All marks are valid", vim.log.levels.INFO)
 	end
 
 	return invalid_marks

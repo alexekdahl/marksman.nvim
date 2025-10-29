@@ -61,6 +61,7 @@ Vim's built-in marks are great, but they're global and get messy fast. Marksman 
     search_in_ui = true,
     undo_levels = 10,
     sort_marks = true,  -- Set to false to keep insertion order
+    silence = false,    -- Set to true to disable all notifications
   },
 }
 ```
@@ -351,6 +352,7 @@ storage.get_project_name()    -- Get current project name
 | `search_in_ui` | boolean | `true` | Enable search in UI |
 | `undo_levels` | number | `10` | Number of deletions to remember |
 | `sort_marks` | boolean | `true` | Sort marks by access time (false = insertion order) |
+| `silence` | boolean | `false` | If notifications should be shown|
 | `highlights` | table | `{...}` | Custom highlight groups |
 
 ### Sorting Behavior

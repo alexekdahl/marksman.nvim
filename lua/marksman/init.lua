@@ -33,9 +33,17 @@ local default_config = {
 	search_in_ui = true,
 	undo_levels = 10,
 	sort_marks = true,
+	silent = false,
 }
 
 local config = {}
+
+-- Helper function for conditional notifications
+local function notify(message, level)
+	if not config.silent then
+		vim.notify(message, level)
+	end
+end
 
 -- Lazy module loading
 local function get_storage()
@@ -68,12 +76,12 @@ function M.add_mark(name, description)
 
 	local bufname = vim.fn.expand("%:p")
 	if bufname == "" then
-		vim.notify("Cannot add mark: no file", vim.log.levels.WARN)
+		notify("Cannot add mark: no file", vim.log.levels.WARN)
 		return false
 	end
 
 	if storage_module.get_marks_count() >= config.max_marks then
-		vim.notify("Maximum marks limit reached (" .. config.max_marks .. ")", vim.log.levels.WARN)
+		notify("Maximum marks limit reached (" .. config.max_marks .. ")", vim.log.levels.WARN)
 		return false
 	end
 
@@ -96,10 +104,10 @@ function M.add_mark(name, description)
 
 	local success = storage_module.add_mark(name, mark)
 	if success then
-		vim.notify("󰃀 Mark added: " .. name, vim.log.levels.INFO)
+		notify("󰃀 Mark added: " .. name, vim.log.levels.INFO)
 		return true
 	else
-		vim.notify("Failed to add mark: " .. name, vim.log.levels.ERROR)
+		notify("Failed to add mark: " .. name, vim.log.levels.ERROR)
 		return false
 	end
 end
@@ -123,7 +131,7 @@ function M.goto_mark(name_or_index)
 
 	if mark then
 		if vim.fn.filereadable(mark.file) == 0 then
-			vim.notify("Mark file no longer exists: " .. mark.file, vim.log.levels.WARN)
+			notify("Mark file no longer exists: " .. mark.file, vim.log.levels.WARN)
 			return false
 		end
 
@@ -133,10 +141,10 @@ function M.goto_mark(name_or_index)
 		vim.cmd("edit " .. vim.fn.fnameescape(mark.file))
 		vim.fn.cursor(mark.line, mark.col)
 		vim.cmd("normal! zz") -- Center the line
-		vim.notify("󰃀 Jumped to: " .. mark_name, vim.log.levels.INFO)
+		notify("󰃀 Jumped to: " .. mark_name, vim.log.levels.INFO)
 		return true
 	else
-		vim.notify("Mark not found: " .. tostring(name_or_index), vim.log.levels.WARN)
+		notify("Mark not found: " .. tostring(name_or_index), vim.log.levels.WARN)
 		return false
 	end
 end
@@ -146,10 +154,10 @@ function M.delete_mark(name)
 	local success = storage_module.delete_mark(name)
 
 	if success then
-		vim.notify("󰃀 Mark deleted: " .. name, vim.log.levels.INFO)
+		notify("󰃀 Mark deleted: " .. name, vim.log.levels.INFO)
 		return true
 	else
-		vim.notify("Mark not found: " .. name, vim.log.levels.WARN)
+		notify("Mark not found: " .. name, vim.log.levels.WARN)
 		return false
 	end
 end
@@ -159,10 +167,10 @@ function M.rename_mark(old_name, new_name)
 	local success = storage_module.rename_mark(old_name, new_name)
 
 	if success then
-		vim.notify("󰃀 Mark renamed: " .. old_name .. " → " .. new_name, vim.log.levels.INFO)
+		notify("󰃀 Mark renamed: " .. old_name .. " → " .. new_name, vim.log.levels.INFO)
 		return true
 	else
-		vim.notify("Failed to rename mark", vim.log.levels.WARN)
+		notify("Failed to rename mark", vim.log.levels.WARN)
 		return false
 	end
 end
@@ -172,10 +180,10 @@ function M.update_mark_description(name, description)
 	local success = storage_module.update_mark_description(name, description)
 
 	if success then
-		vim.notify("󰃀 Mark description updated: " .. name, vim.log.levels.INFO)
+		notify("󰃀 Mark description updated: " .. name, vim.log.levels.INFO)
 		return true
 	else
-		vim.notify("Failed to update mark description", vim.log.levels.WARN)
+		notify("Failed to update mark description", vim.log.levels.WARN)
 		return false
 	end
 end
@@ -186,7 +194,7 @@ function M.show_marks()
 
 	local marks = storage_module.get_marks()
 	if vim.tbl_isempty(marks) then
-		vim.notify("No marks in current project", vim.log.levels.INFO)
+		notify("No marks in current project", vim.log.levels.INFO)
 		return
 	end
 
@@ -201,7 +209,7 @@ function M.search_marks(query)
 	local filtered = utils_module.filter_marks(marks, query)
 
 	if vim.tbl_isempty(filtered) then
-		vim.notify("No marks found matching: " .. query, vim.log.levels.INFO)
+		notify("No marks found matching: " .. query, vim.log.levels.INFO)
 		return {}
 	end
 
@@ -225,7 +233,7 @@ function M.clear_all_marks()
 		if choice == "Yes" then
 			local storage_module = get_storage()
 			storage_module.clear_all_marks()
-			vim.notify("󰃀 All marks cleared", vim.log.levels.INFO)
+			notify("󰃀 All marks cleared", vim.log.levels.INFO)
 		end
 	end)
 end
@@ -245,10 +253,10 @@ function M.undo_last_deletion()
 	local restored = storage_module.undo_last_deletion()
 
 	if restored then
-		vim.notify("󰃀 Restored mark: " .. restored, vim.log.levels.INFO)
+		notify("󰃀 Restored mark: " .. restored, vim.log.levels.INFO)
 		return true
 	else
-		vim.notify("Nothing to undo", vim.log.levels.INFO)
+		notify("Nothing to undo", vim.log.levels.INFO)
 		return false
 	end
 end

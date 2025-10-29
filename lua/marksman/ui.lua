@@ -3,7 +3,13 @@ local M = {}
 
 local config = {}
 local current_window = nil
-local current_buffer = nil
+
+-- Helper function for conditional notifications
+local function notify(message, level)
+	if not config.silent then
+		vim.notify(message, level)
+	end
+end
 
 local function setup_highlights()
 	for name, attrs in pairs(config.highlights) do
@@ -353,7 +359,7 @@ local function setup_window_keymaps(buf, marks, project_name, mark_info, search_
 			stats.most_accessed or "none"
 		)
 
-		vim.notify(stats_text, vim.log.levels.INFO)
+		notify(stats_text, vim.log.levels.INFO)
 	end
 
 	local keymap_opts = { buffer = buf, noremap = true, silent = true }
