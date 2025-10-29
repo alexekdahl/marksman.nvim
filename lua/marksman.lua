@@ -568,14 +568,4 @@ function M.setup(opts)
 	init()
 end
 
--- Auto-initialize on first use
-setmetatable(M, {
-	__index = function(t, k)
-		if not initialized and k ~= "setup" then
-			init()
-		end
-		return rawget(t, k)
-	end,
-})
-
 return M
