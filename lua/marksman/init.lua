@@ -34,6 +34,7 @@ local default_config = {
 	undo_levels = 10,
 	sort_marks = true,
 	silent = false,
+	minimal = false, -- Set to true for clean UI (only order and filename)
 }
 
 local config = {}

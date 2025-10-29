@@ -139,6 +139,42 @@ local function create_marks_content(marks, search_query)
 		end)
 	end
 
+	-- MINIMAL MODE: Show only order and filename
+	if config.minimal then
+		if vim.tbl_isempty(filtered_marks) then
+			table.insert(lines, " No marks")
+			return lines, highlights, {}
+		end
+
+		for i, name in ipairs(mark_names) do
+			local mark = filtered_marks[name]
+			local filename = vim.fn.fnamemodify(mark.file, ":t")
+			local line = string.format("[%d] %s", i, filename)
+			table.insert(lines, line)
+
+			local line_idx = #lines - 1
+			mark_info[line_idx] = { name = name, mark = mark, index = i }
+
+			-- Highlight the number
+			table.insert(highlights, {
+				line = line_idx,
+				col = 0,
+				end_col = string.len(string.format("[%d]", i)),
+				hl_group = "ProjectMarksNumber",
+			})
+			-- Highlight the filename
+			table.insert(highlights, {
+				line = line_idx,
+				col = string.len(string.format("[%d] ", i)),
+				end_col = -1,
+				hl_group = "ProjectMarksFile",
+			})
+		end
+
+		return lines, highlights, mark_info
+	end
+
+	-- NORMAL MODE: Full detailed view
 	-- Header
 	local title = search_query
 			and search_query ~= ""
