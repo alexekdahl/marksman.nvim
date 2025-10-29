@@ -2,23 +2,29 @@
   <img src="assets/marksman.png" alt="marksman.nvim logo" width="420"/>
 </p>
 
-<h1 align="center">Marksman.nvim</h1>
+<h1 align="center">Marksman.nvim v2.0</h1>
 
 <p align="center">
-  Quick bookmarks for Neovim that actually stick around.
+  Advanced bookmarks for Neovim that actually stick around.
 </p>
 
 ## Why?
 
-Vim's built-in marks are great, but they're global and get messy fast. Marksman keeps your bookmarks organized by project and gives you a clean interface to manage them.
+Vim's built-in marks are great, but they're global and get messy fast. Marksman keeps your bookmarks organized by project, adds powerful search capabilities, and provides a clean interface to manage them with modern features like undo support and mark descriptions.
 
-## What you get
+## Features
 
-- **Project-scoped marks** - Each project gets its own set of bookmarks
-- **Persistent storage** - Your marks survive Neovim restarts  
-- **Smart naming** - Auto-generates useful names based on context
+- **Project-scoped marks** - Each project gets its own isolated set of bookmarks
+- **Persistent storage** - Your marks survive Neovim restarts with automatic backup
+- **Smart naming** - Context-aware auto-generation of mark names based on code structure
 - **Quick access** - Jump to your most recent marks with single keys
-- **Clean interface** - Browse and manage marks in a floating window
+- **Enhanced search** - Find marks by name, description, file path, or content
+- **Mark descriptions** - Add context and notes to your bookmarks
+- **Undo support** - Restore accidentally deleted marks
+- **Statistics** - View detailed analytics about your mark usage
+- **Validation** - Check and clean up marks pointing to non-existent files
+- **Interactive UI** - Browse and manage marks in an enhanced floating window
+- **Multiple integrations** - Works with Telescope, Snacks.nvim, and more
 
 ## Requirements
 
@@ -35,7 +41,32 @@ Vim's built-in marks are great, but they're global and get messy fast. Marksman 
 }
 ```
 
+### With full configuration
+
+```lua
+{
+  "alexekdahl/marksman.nvim",
+  opts = {
+    keymaps = {
+      add = "<C-a>",
+      show = "<C-e>", 
+      goto_1 = "<M-y>",
+      goto_2 = "<M-u>",
+      goto_3 = "<M-i>",
+      goto_4 = "<M-o>",
+    },
+    auto_save = true,
+    max_marks = 100,
+    enable_descriptions = true,
+    search_in_ui = true,
+    undo_levels = 10,
+  },
+}
+```
+
 ## Setup
+
+### Basic Setup
 
 ```lua
 require("marksman").setup({
@@ -49,10 +80,12 @@ require("marksman").setup({
   },
   auto_save = true,
   max_marks = 100,
+  enable_descriptions = true,
+  undo_levels = 10,
 })
 ```
 
-Want different keys? No problem:
+### Custom Keymaps
 
 ```lua
 require("marksman").setup({
@@ -67,29 +100,90 @@ require("marksman").setup({
 })
 ```
 
+### Custom Highlights
+
+```lua
+require("marksman").setup({
+  highlights = {
+    ProjectMarksTitle = { fg = "#61AFEF", bold = true },
+    ProjectMarksNumber = { fg = "#C678DD" },
+    ProjectMarksName = { fg = "#98C379", bold = true },
+    ProjectMarksFile = { fg = "#56B6C2" },
+    ProjectMarksLine = { fg = "#D19A66" },
+    ProjectMarksText = { fg = "#5C6370", italic = true },
+    ProjectMarksHelp = { fg = "#61AFEF" },
+    ProjectMarksBorder = { fg = "#5A5F8C" },
+    ProjectMarksSearch = { fg = "#E5C07B" },
+  },
+})
+```
+
 ## How to use it
+
+### Basic Usage
 
 1. **Add a mark**: Press `<C-a>` (or your custom key) 
 2. **See your marks**: Press `<C-e>` to open the marks window
 3. **Jump around**: Use `<M-y>`, `<M-u>`, etc. to jump to recent marks
-4. **In the marks window**: Press Enter or 1-9 to jump, `d` to delete, `r` to rename
+4. **In the marks window**: 
+   - Press Enter or 1-9 to jump
+   - `d` to delete
+   - `r` to rename  
+   - `e` to edit description
+   - `/` to search
+   - `u` to undo last deletion
+   - `v` to validate marks
+   - `s` to show statistics
+
+### Advanced Features
+
+#### Mark Descriptions
+Add context to your marks for better organization:
+```lua
+require("marksman").add_mark("api_endpoint", "Main API route handler")
+```
+
+#### Search Functionality
+Search through all mark data:
+```lua
+require("marksman").search_marks("api controller")
+```
+
+#### Undo Deletions
+Restore accidentally deleted marks:
+```lua
+require("marksman").undo_last_deletion()
+```
 
 ## Commands
 
 ```
-:MarkAdd [name]     - Add a mark (auto-names if no name given)
-:MarkGoto [name]    - Jump to mark or show marks list
-:MarkDelete [name]  - Delete a mark  
-:MarkRename old new - Rename a mark
-:MarkList           - Show all marks
-:MarkClear          - Clear all marks in project
-:MarkExport         - Export marks to JSON
-:MarkImport         - Import marks from JSON
+:MarkAdd [name] [description]  - Add a mark with optional description
+:MarkGoto [name]              - Jump to mark or show marks list
+:MarkDelete [name]            - Delete a mark  
+:MarkRename old new           - Rename a mark
+:MarkList                     - Show all marks in enhanced UI
+:MarkClear                    - Clear all marks in project
+:MarkSearch [query]           - Search marks
+:MarkUndo                     - Undo last deletion
+:MarkExport                   - Export marks to JSON
+:MarkImport                   - Import marks from JSON
 ```
 
-## Telescope integration
+## Enhanced UI Features
 
-If you use Telescope, drop this in your config:
+The floating window now includes:
+
+- **Real-time search** - Press `/` to filter marks instantly
+- **Mark descriptions** - View and edit contextual information
+- **Enhanced navigation** - Better keyboard shortcuts and visual feedback
+- **Statistics** - Press `s` to view detailed mark analytics
+- **Validation** - Press `v` to check mark integrity
+- **Undo support** - Press `u` to restore deleted marks
+
+## Telescope Integration
+
+Enhanced Telescope integration with search support:
 
 ```lua
 local function telescope_marksman()
@@ -109,20 +203,28 @@ local function telescope_marksman()
   
   local entries = {}
   for name, mark in pairs(marks) do
+    local display_text = name
+    if mark.description and mark.description ~= "" then
+      display_text = display_text .. " - " .. mark.description
+    end
+    
     table.insert(entries, {
       value = name,
-      display = name .. " - " .. vim.fn.fnamemodify(mark.file, ":~:.") .. ":" .. mark.line,
-      ordinal = name .. " " .. mark.file,
+      display = display_text .. " (" .. vim.fn.fnamemodify(mark.file, ":~:.") .. ":" .. mark.line .. ")",
+      ordinal = name .. " " .. (mark.description or "") .. " " .. mark.file,
       filename = mark.file,
       lnum = mark.line,
       col = mark.col,
     })
   end
   
+  -- Sort by access time
   table.sort(entries, function(a, b)
     local mark_a = marks[a.value]
     local mark_b = marks[b.value]
-    return (mark_a.created_at or 0) > (mark_b.created_at or 0)
+    local time_a = mark_a.accessed_at or mark_a.created_at or 0
+    local time_b = mark_b.accessed_at or mark_b.created_at or 0
+    return time_a > time_b
   end)
   
   pickers.new({}, {
@@ -149,9 +251,9 @@ end
 vim.keymap.set("n", "<leader>fm", telescope_marksman, { desc = "Find marks" })
 ```
 
-## Snacks.nvim integration
+## Snacks.nvim Integration
 
-For snacks.nvim users, add this function to your utils:
+Enhanced integration for snacks.nvim users:
 
 ```lua
 function M.snacks_marksman()
@@ -171,74 +273,117 @@ function M.snacks_marksman()
       text = name,
       file = mark.file,
       pos = { tonumber(mark.line) or 1, tonumber(mark.col) or 1 },
-      display = string.format("%s %s:%d", name, vim.fn.fnamemodify(mark.file, ":~:."), tonumber(mark.line) or 1),
-      ordinal = name .. " " .. vim.fn.fnamemodify(mark.file, ":t"),
+      display = string.format("%s %s:%d", 
+        name, 
+        vim.fn.fnamemodify(mark.file, ":~:."), 
+        tonumber(mark.line) or 1
+      ),
+      ordinal = name .. " " .. (mark.description or "") .. " " .. vim.fn.fnamemodify(mark.file, ":t"),
       mark_name = name,
     }
+    
+    if mark.description and mark.description ~= "" then
+      entry.display = entry.display .. " - " .. mark.description
+    end
+    
     table.insert(results, entry)
   end
   
-  -- Sort by creation time (newest first)
+  -- Sort by access time
   table.sort(results, function(a, b)
     local mark_a = marks[a.mark_name]
     local mark_b = marks[b.mark_name]
-    return (mark_a.created_at or 0) > (mark_b.created_at or 0)
+    local time_a = mark_a.accessed_at or mark_a.created_at or 0
+    local time_b = mark_b.accessed_at or mark_b.created_at or 0
+    return time_a > time_b
   end)
   
   return results
 end
 ```
 
-Then configure the picker source:
+## API Reference
 
-```lua
-{
-  "folke/snacks.nvim",
-  opts = {
-    picker = {
-      sources = {
-        marksman = {
-          name = "Marksman Marks",
-          finder = your_util.snacks_marksman, -- replace with your function
-          confirm = function(item)
-            if item and item.mark_name then
-              require("marksman").goto_mark(item.mark_name)
-            end
-          end,
-        },
-      },
-    },
-  },
-  keys = {
-    {
-      "<leader>b",
-      function()
-        Snacks.picker.pick("marksman")
-      end,
-      desc = "Find Marks",
-    },
-  },
-}
-```
-
-## API
+### Core Functions
 
 ```lua
 local marksman = require("marksman")
 
-marksman.add_mark("my_mark")       -- Add a mark
-marksman.goto_mark("my_mark")      -- Jump to mark by name
-marksman.goto_mark(1)              -- Jump to first mark  
-marksman.delete_mark("my_mark")    -- Delete a mark
-marksman.show_marks()              -- Open marks window
-marksman.get_marks_count()         -- Get number of marks
+-- Basic operations
+marksman.add_mark("my_mark", "Optional description")
+marksman.goto_mark("my_mark")
+marksman.goto_mark(1)  -- Jump to first mark by index
+marksman.delete_mark("my_mark")
+marksman.rename_mark("old_name", "new_name")
+
+-- Enhanced features
+marksman.update_mark_description("my_mark", "New description")
+marksman.search_marks("search query")
+marksman.undo_last_deletion()
+marksman.show_marks()
+
+-- Utility functions
+marksman.get_marks()
+marksman.get_marks_count()
+marksman.export_marks()
+marksman.import_marks()
 ```
+
+### Storage Operations
+
+```lua
+local storage = require("marksman.storage")
+
+storage.get_statistics()      -- Get detailed analytics
+storage.validate_marks()      -- Check mark integrity
+storage.get_project_name()    -- Get current project name
+```
+
+## Configuration Options
+
+| Option | Type | Default | Description |
+|--------|------|---------|-------------|
+| `keymaps` | table | `{...}` | Key mappings for mark operations |
+| `auto_save` | boolean | `true` | Automatically save marks |
+| `max_marks` | number | `100` | Maximum marks per project |
+| `enable_descriptions` | boolean | `true` | Enable mark descriptions |
+| `search_in_ui` | boolean | `true` | Enable search in UI |
+| `undo_levels` | number | `10` | Number of deletions to remember |
+| `highlights` | table | `{...}` | Custom highlight groups |
 
 ## How it works
 
-Marks get saved to `~/.local/share/nvim/marksman_[hash].json` where the hash comes from your project path. Each project gets its own file, so your marks stay organized.
+### Storage
+Marks are stored in `~/.local/share/nvim/marksman_[hash].json` where the hash is derived from your project path. Each project gets its own file with automatic backup support.
 
-When you add a mark without a name, Marksman tries to be smart about it - it'll use function names, class names, or just fall back to filename:line.
+### Smart Naming
+When you add a mark without a name, Marksman analyzes the code context to generate meaningful names:
+
+- **Functions**: `fn:calculate_total`
+- **Classes**: `class:UserModel` 
+- **Structs**: `struct:Config`
+- **Fallback**: `filename:line`
+
+### Project Detection
+Marksman uses multiple methods to find your project root:
+
+1. Git repository root
+2. Common project files (.git, package.json, Cargo.toml, etc.)
+3. Current working directory as fallback
+
+### Search Algorithm
+The search function looks through:
+- Mark names
+- Mark descriptions  
+- File names and paths
+- Code context (the line content)
+
+## Performance
+
+- **Lazy loading**: Modules are only loaded when needed
+- **Efficient storage**: JSON format with minimal file I/O
+- **Smart caching**: Marks are cached in memory after first load
+- **Fast search**: Optimized filtering algorithms
 
 ## License
 
