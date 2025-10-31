@@ -135,8 +135,14 @@ local function get_context_from_line(line, file_ext)
 	local fallback_patterns = {
 		"([%w_]+)%s*[:=]", -- assignment patterns
 		"([%w_]+)%s*{", -- opening brace patterns
-		"([%w_]+)%s*%()", -- function call patterns
 	}
+
+	-- Handle function calls separately to avoid pattern escaping issues
+	local func_pattern = "([%w_]+)%s*"
+	local identifier = context:match(func_pattern .. "%(")
+	if identifier then
+		return identifier, "identifier"
+	end
 
 	for _, pattern in ipairs(fallback_patterns) do
 		local identifier = context:match(pattern)
@@ -217,17 +223,10 @@ function M.filter_marks(marks, query)
 	local search_terms = vim.split(query:lower(), "%s+")
 
 	for name, mark in pairs(marks) do
-		local searchable_text = (
-			name
-			.. " "
-			.. (mark.description or "")
-			.. " "
-			.. vim.fn.fnamemodify(mark.file, ":t")
-			.. " "
-			.. vim.fn.fnamemodify(mark.file, ":p:h:t")
-			.. " " -- parent directory
-			.. (mark.text or "")
-		):lower()
+		local searchable_text = (name .. " " .. vim.fn.fnamemodify(mark.file, ":t") .. " " .. vim.fn.fnamemodify(
+			mark.file,
+			":p:h:t"
+		) .. " " .. (mark.text or "")):lower()
 
 		local matches_all = true
 		for _, term in ipairs(search_terms) do
@@ -356,50 +355,6 @@ function M.merge_marks(base_marks, new_marks, strategy)
 	end
 
 	return result
-end
-
-function M.get_mark_statistics(marks)
-	local stats = {
-		total = 0,
-		by_extension = {},
-		by_directory = {},
-		access_frequency = {},
-		age_distribution = {},
-	}
-
-	local now = os.time()
-
-	for name, mark in pairs(marks) do
-		stats.total = stats.total + 1
-
-		-- File extension stats
-		local ext = get_file_extension(mark.file)
-		stats.by_extension[ext] = (stats.by_extension[ext] or 0) + 1
-
-		-- Directory stats
-		local dir = vim.fn.fnamemodify(mark.file, ":h:t")
-		stats.by_directory[dir] = (stats.by_directory[dir] or 0) + 1
-
-		-- Access frequency
-		local access_count = mark.access_count or 0
-		local freq_bucket = access_count == 0 and "never"
-			or access_count < 5 and "low"
-			or access_count < 20 and "medium"
-			or "high"
-		stats.access_frequency[freq_bucket] = (stats.access_frequency[freq_bucket] or 0) + 1
-
-		-- Age distribution
-		if mark.created_at then
-			local age_days = math.floor((now - mark.created_at) / 86400)
-			local age_bucket = age_days < 1 and "today"
-				or age_days < 7 and "week"
-				or age_days < 30 and "month"
-				or "older"
-			stats.age_distribution[age_bucket] = (stats.age_distribution[age_bucket] or 0) + 1
-		end
-	end
-
-	return stats
 end
 
 function M.suggest_mark_name(bufname, line, existing_marks)
