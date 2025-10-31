@@ -56,7 +56,7 @@ Vim's built-in marks are great, but they're global and get messy fast. Marksman 
     max_marks = 100,
     search_in_ui = true,
     sort_marks = true,
-    silence = false,
+    silent = false,
     minimal = false,
   },
 }
@@ -317,6 +317,7 @@ storage.get_project_name()    -- Get current project name
 | `search_in_ui` | boolean | `true` | Enable search in UI |
 | `sort_marks` | boolean | `true` | Sort marks by access time (false = insertion order) |
 | `minimal` | boolean | `false` | Set to true for clean UI (only order and filepath)|
+| `silent` | boolean | `false` | Set to true to supress notifications|
 | `highlights` | table | `{...}` | Custom highlight groups |
 
 ### Sorting Behavior
