@@ -5,22 +5,12 @@ local M = {}
 local marks = {}
 local current_project = nil
 local config = {}
-local deletion_history = {}
 
 -- Helper function for conditional notifications
 local function notify(message, level)
 	if not config.silent then
 		vim.notify(message, level)
 	end
-end
-
--- Initialize deletion history as a circular buffer
-local function init_deletion_history()
-	deletion_history = {
-		items = {},
-		max_size = 0,
-		current = 0,
-	}
 end
 
 local function get_project_root()
@@ -147,27 +137,9 @@ local function save_marks()
 	return true
 end
 
-local function add_to_deletion_history(name, mark)
-	if deletion_history.max_size <= 0 then
-		return
-	end
-
-	local item = {
-		name = name,
-		mark = vim.deepcopy(mark),
-		deleted_at = os.time(),
-	}
-
-	-- Add to circular buffer
-	deletion_history.current = (deletion_history.current % deletion_history.max_size) + 1
-	deletion_history.items[deletion_history.current] = item
-end
-
 -- Public API
 function M.setup(user_config)
 	config = user_config or {}
-	init_deletion_history()
-	deletion_history.max_size = config.undo_levels or 10
 	load_marks()
 end
 
@@ -232,8 +204,6 @@ function M.delete_mark(name)
 	local marks_data = M.get_marks()
 
 	if marks_data[name] then
-		-- Add to deletion history before removing
-		add_to_deletion_history(name, marks_data[name])
 		marks_data[name] = nil
 		return save_marks()
 	end
@@ -272,53 +242,9 @@ function M.update_mark_access(name)
 	return false
 end
 
-function M.update_mark_description(name, description)
-	local marks_data = M.get_marks()
-
-	if marks_data[name] then
-		marks_data[name].description = description or ""
-		return save_marks()
-	end
-
-	return false
-end
-
 function M.clear_all_marks()
 	marks = {}
 	return save_marks()
-end
-
-function M.undo_last_deletion()
-	if deletion_history.max_size <= 0 or #deletion_history.items == 0 then
-		return nil
-	end
-
-	-- Find the most recent deletion
-	local latest_item = nil
-	local latest_time = 0
-	local latest_index = nil
-
-	for i, item in ipairs(deletion_history.items) do
-		if item and item.deleted_at > latest_time then
-			latest_item = item
-			latest_time = item.deleted_at
-			latest_index = i
-		end
-	end
-
-	if latest_item then
-		-- Restore the mark
-		local marks_data = M.get_marks()
-		marks_data[latest_item.name] = latest_item.mark
-		save_marks()
-
-		-- Remove from deletion history
-		deletion_history.items[latest_index] = nil
-
-		return latest_item.name
-	end
-
-	return nil
 end
 
 function M.export_marks()
@@ -443,48 +369,6 @@ function M.validate_marks()
 	end
 
 	return invalid_marks
-end
-
-function M.get_statistics()
-	local marks_data = M.get_marks()
-	local stats = {
-		total_marks = vim.tbl_count(marks_data),
-		project = M.get_project_name(),
-		oldest_mark = nil,
-		newest_mark = nil,
-		most_accessed = nil,
-		file_distribution = {},
-	}
-
-	local oldest_time = math.huge
-	local newest_time = 0
-	local max_access_count = 0
-
-	for name, mark in pairs(marks_data) do
-		-- Track oldest/newest
-		local created_time = mark.created_at or 0
-		if created_time < oldest_time then
-			oldest_time = created_time
-			stats.oldest_mark = name
-		end
-		if created_time > newest_time then
-			newest_time = created_time
-			stats.newest_mark = name
-		end
-
-		-- Track access patterns
-		local access_count = mark.access_count or 0
-		if access_count > max_access_count then
-			max_access_count = access_count
-			stats.most_accessed = name
-		end
-
-		-- File distribution
-		local file = vim.fn.fnamemodify(mark.file, ":t")
-		stats.file_distribution[file] = (stats.file_distribution[file] or 0) + 1
-	end
-
-	return stats
 end
 
 return M

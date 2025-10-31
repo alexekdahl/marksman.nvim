@@ -86,6 +86,18 @@ local function close_window()
 	end
 end
 
+local function get_relative_path_display(filepath)
+	-- Show relative path from current working directory
+	local rel_path = vim.fn.fnamemodify(filepath, ":~:.")
+	-- If the path is still too long, show parent directory + filename
+	if #rel_path > 50 then
+		local parent = vim.fn.fnamemodify(filepath, ":h:t")
+		local filename = vim.fn.fnamemodify(filepath, ":t")
+		return parent .. "/" .. filename
+	end
+	return rel_path
+end
+
 local function create_marks_content(marks, search_query)
 	local lines = {}
 	local highlights = {}
@@ -96,15 +108,7 @@ local function create_marks_content(marks, search_query)
 	if search_query and search_query ~= "" then
 		search_query = search_query:lower()
 		for name, mark in pairs(marks) do
-			local searchable = (
-				name
-				.. " "
-				.. (mark.description or "")
-				.. " "
-				.. vim.fn.fnamemodify(mark.file, ":t")
-				.. " "
-				.. (mark.text or "")
-			):lower()
+			local searchable = (name .. " " .. vim.fn.fnamemodify(mark.file, ":t") .. " " .. (mark.text or "")):lower()
 			if searchable:find(search_query, 1, true) then
 				filtered_marks[name] = mark
 			end
@@ -139,7 +143,7 @@ local function create_marks_content(marks, search_query)
 		end)
 	end
 
-	-- MINIMAL MODE: Show only order and filename
+	-- MINIMAL MODE: Show only order and filepath
 	if config.minimal then
 		if vim.tbl_isempty(filtered_marks) then
 			table.insert(lines, " No marks")
@@ -148,8 +152,8 @@ local function create_marks_content(marks, search_query)
 
 		for i, name in ipairs(mark_names) do
 			local mark = filtered_marks[name]
-			local filename = vim.fn.fnamemodify(mark.file, ":t")
-			local line = string.format("[%d] %s", i, filename)
+			local filepath = get_relative_path_display(mark.file)
+			local line = string.format("[%d] %s", i, filepath)
 			table.insert(lines, line)
 
 			local line_idx = #lines - 1
@@ -162,7 +166,7 @@ local function create_marks_content(marks, search_query)
 				end_col = string.len(string.format("[%d]", i)),
 				hl_group = "ProjectMarksNumber",
 			})
-			-- Highlight the filename
+			-- Highlight the filepath
 			table.insert(highlights, {
 				line = line_idx,
 				col = string.len(string.format("[%d] ", i)),
@@ -194,8 +198,8 @@ local function create_marks_content(marks, search_query)
 
 	-- Help text
 	local help_lines = {
-		" <CR>/1-9: Jump  d: Delete  r: Rename  e: Edit desc  /: Search",
-		" u: Undo delete  v: Validate  s: Stats  q: Close",
+		" <CR>/1-9: Jump  d: Delete  r: Rename  /: Search",
+		" v: Validate  q: Close",
 	}
 	for _, help_line in ipairs(help_lines) do
 		table.insert(lines, help_line)
@@ -214,7 +218,7 @@ local function create_marks_content(marks, search_query)
 	for i, name in ipairs(mark_names) do
 		local mark = filtered_marks[name]
 		local icon = get_icon_for_file(mark.file)
-		local rel_path = vim.fn.fnamemodify(mark.file, ":~:.")
+		local rel_path = get_relative_path_display(mark.file)
 		local time_str = format_time_ago(mark.accessed_at or mark.created_at)
 
 		local number = string.format("[%d]", i)
@@ -241,18 +245,6 @@ local function create_marks_content(marks, search_query)
 			end_col = #number + 1 + #name_part,
 			hl_group = "ProjectMarksName",
 		})
-
-		-- Description line (if exists)
-		if config.enable_descriptions and mark.description and mark.description ~= "" then
-			local desc_line = "   │ " .. mark.description
-			table.insert(lines, desc_line)
-			table.insert(highlights, {
-				line = #lines - 1,
-				col = 0,
-				end_col = -1,
-				hl_group = "ProjectMarksText",
-			})
-		end
 
 		-- Preview text
 		local preview = "   │ " .. (mark.text or ""):gsub("^%s+", ""):gsub("%s+$", "")
@@ -342,23 +334,6 @@ local function setup_window_keymaps(buf, marks, project_name, mark_info, search_
 		end
 	end
 
-	local function edit_description()
-		local mark_info_item = get_mark_under_cursor(mark_info)
-		if mark_info_item then
-			local current_desc = mark_info_item.mark.description or ""
-			vim.ui.input({
-				prompt = "Description: ",
-				default = current_desc,
-			}, function(new_desc)
-				if new_desc ~= nil then
-					local marksman = require("marksman")
-					marksman.update_mark_description(mark_info_item.name, new_desc)
-					refresh_window(search_query)
-				end
-			end)
-		end
-	end
-
 	local function search_marks()
 		vim.ui.input({
 			prompt = "Search: ",
@@ -370,32 +345,9 @@ local function setup_window_keymaps(buf, marks, project_name, mark_info, search_
 		end)
 	end
 
-	local function undo_deletion()
-		local marksman = require("marksman")
-		if marksman.undo_last_deletion() then
-			refresh_window(search_query)
-		end
-	end
-
 	local function validate_marks()
 		local storage = require("marksman.storage")
 		storage.validate_marks()
-	end
-
-	local function show_statistics()
-		local storage = require("marksman.storage")
-		local stats = storage.get_statistics()
-
-		local stats_text = string.format(
-			"Project: %s\nTotal marks: %d\nOldest: %s\nNewest: %s\nMost accessed: %s",
-			stats.project,
-			stats.total_marks,
-			stats.oldest_mark or "none",
-			stats.newest_mark or "none",
-			stats.most_accessed or "none"
-		)
-
-		notify(stats_text, vim.log.levels.INFO)
 	end
 
 	local keymap_opts = { buffer = buf, noremap = true, silent = true }
@@ -408,11 +360,8 @@ local function setup_window_keymaps(buf, marks, project_name, mark_info, search_
 	-- Mark operations
 	vim.keymap.set("n", "d", delete_selected, keymap_opts)
 	vim.keymap.set("n", "r", rename_selected, keymap_opts)
-	vim.keymap.set("n", "e", edit_description, keymap_opts)
 	vim.keymap.set("n", "/", search_marks, keymap_opts)
-	vim.keymap.set("n", "u", undo_deletion, keymap_opts)
 	vim.keymap.set("n", "v", validate_marks, keymap_opts)
-	vim.keymap.set("n", "s", show_statistics, keymap_opts)
 
 	-- Number key navigation
 	for i = 1, 9 do
@@ -504,7 +453,7 @@ end
 
 function M.show_search_results(results, query)
 	if vim.tbl_isempty(results) then
-		vim.notify("No marks found matching: " .. query, vim.log.levels.INFO)
+		notify("No marks found matching: " .. query, vim.log.levels.INFO)
 		return
 	end
 

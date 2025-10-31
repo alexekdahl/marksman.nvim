@@ -29,9 +29,7 @@ local default_config = {
 	},
 	auto_save = true,
 	max_marks = 100,
-	enable_descriptions = true,
 	search_in_ui = true,
-	undo_levels = 10,
 	sort_marks = true,
 	silent = false,
 	minimal = false, -- Set to true for clean UI (only order and filename)
@@ -98,7 +96,6 @@ function M.add_mark(name, description)
 		line = line,
 		col = col,
 		text = vim.fn.getline("."):sub(1, 80),
-		description = description or "",
 		created_at = os.time(),
 		accessed_at = os.time(),
 	}
@@ -176,19 +173,6 @@ function M.rename_mark(old_name, new_name)
 	end
 end
 
-function M.update_mark_description(name, description)
-	local storage_module = get_storage()
-	local success = storage_module.update_mark_description(name, description)
-
-	if success then
-		notify("󰃀 Mark description updated: " .. name, vim.log.levels.INFO)
-		return true
-	else
-		notify("Failed to update mark description", vim.log.levels.WARN)
-		return false
-	end
-end
-
 function M.show_marks()
 	local storage_module = get_storage()
 	local ui_module = get_ui()
@@ -249,19 +233,6 @@ function M.import_marks()
 	return storage_module.import_marks()
 end
 
-function M.undo_last_deletion()
-	local storage_module = get_storage()
-	local restored = storage_module.undo_last_deletion()
-
-	if restored then
-		notify("󰃀 Restored mark: " .. restored, vim.log.levels.INFO)
-		return true
-	else
-		notify("Nothing to undo", vim.log.levels.INFO)
-		return false
-	end
-end
-
 function M.setup(opts)
 	config = vim.tbl_deep_extend("force", default_config, opts or {})
 
@@ -319,7 +290,6 @@ function M.setup(opts)
 			end,
 			{ nargs = 1 },
 		},
-		{ "MarkUndo", M.undo_last_deletion, {} },
 	}
 
 	for _, cmd in ipairs(commands) do

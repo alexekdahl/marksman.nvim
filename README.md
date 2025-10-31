@@ -10,7 +10,7 @@
 
 ## Why?
 
-Vim's built-in marks are great, but they're global and get messy fast. Marksman keeps your bookmarks organized by project, adds powerful search capabilities, and provides a clean interface to manage them with modern features like undo support and mark descriptions.
+Vim's built-in marks are great, but they're global and get messy fast. Marksman keeps your bookmarks organized by project, adds powerful search capabilities, and provides a clean interface to manage them with modern features like smart naming and file path display.
 
 ## Features
 
@@ -18,10 +18,7 @@ Vim's built-in marks are great, but they're global and get messy fast. Marksman 
 - **Persistent storage** - Your marks survive Neovim restarts with automatic backup
 - **Smart naming** - Context-aware auto-generation of mark names based on code structure
 - **Quick access** - Jump to your most recent marks with single keys
-- **Enhanced search** - Find marks by name, description, file path, or content
-- **Mark descriptions** - Add context and notes to your bookmarks
-- **Undo support** - Restore accidentally deleted marks
-- **Statistics** - View detailed analytics about your mark usage
+- **Enhanced search** - Find marks by name, file path, or content
 - **Validation** - Check and clean up marks pointing to non-existent files
 - **Interactive UI** - Browse and manage marks in an enhanced floating window
 - **Multiple integrations** - Works with Telescope, Snacks.nvim, and more
@@ -57,9 +54,7 @@ Vim's built-in marks are great, but they're global and get messy fast. Marksman 
     },
     auto_save = true,
     max_marks = 100,
-    enable_descriptions = true,
     search_in_ui = true,
-    undo_levels = 10,
     sort_marks = true,
     silence = false,
     minimal = false,
@@ -83,8 +78,6 @@ require("marksman").setup({
   },
   auto_save = true,
   max_marks = 100,
-  enable_descriptions = true,
-  undo_levels = 10,
 })
 ```
 
@@ -132,19 +125,10 @@ require("marksman").setup({
    - Press Enter or 1-9 to jump
    - `d` to delete
    - `r` to rename  
-   - `e` to edit description
    - `/` to search
-   - `u` to undo last deletion
    - `v` to validate marks
-   - `s` to show statistics
 
 ### Advanced Features
-
-#### Mark Descriptions
-Add context to your marks for better organization:
-```lua
-require("marksman").add_mark("api_endpoint", "Main API route handler")
-```
 
 #### Search Functionality
 Search through all mark data:
@@ -152,37 +136,28 @@ Search through all mark data:
 require("marksman").search_marks("api controller")
 ```
 
-#### Undo Deletions
-Restore accidentally deleted marks:
-```lua
-require("marksman").undo_last_deletion()
-```
-
 ## Commands
 
 ```
-:MarkAdd [name] [description]  - Add a mark with optional description
-:MarkGoto [name]              - Jump to mark or show marks list
-:MarkDelete [name]            - Delete a mark  
-:MarkRename old new           - Rename a mark
-:MarkList                     - Show all marks in enhanced UI
-:MarkClear                    - Clear all marks in project
-:MarkSearch [query]           - Search marks
-:MarkUndo                     - Undo last deletion
-:MarkExport                   - Export marks to JSON
-:MarkImport                   - Import marks from JSON
+:MarkAdd [name]              - Add a mark with optional name
+:MarkGoto [name]             - Jump to mark or show marks list
+:MarkDelete [name]           - Delete a mark  
+:MarkRename old new          - Rename a mark
+:MarkList                    - Show all marks in enhanced UI
+:MarkClear                   - Clear all marks in project
+:MarkSearch [query]          - Search marks
+:MarkExport                  - Export marks to JSON
+:MarkImport                  - Import marks from JSON
 ```
 
 ## Enhanced UI Features
 
-The floating window now includes:
+The floating window includes:
 
 - **Real-time search** - Press `/` to filter marks instantly
-- **Mark descriptions** - View and edit contextual information
 - **Enhanced navigation** - Better keyboard shortcuts and visual feedback
-- **Statistics** - Press `s` to view detailed mark analytics
+- **File path display** - View relative file paths for better context
 - **Validation** - Press `v` to check mark integrity
-- **Undo support** - Press `u` to restore deleted marks
 
 ## Telescope Integration
 
@@ -207,14 +182,11 @@ local function telescope_marksman()
   local entries = {}
   for name, mark in pairs(marks) do
     local display_text = name
-    if mark.description and mark.description ~= "" then
-      display_text = display_text .. " - " .. mark.description
-    end
     
     table.insert(entries, {
       value = name,
       display = display_text .. " (" .. vim.fn.fnamemodify(mark.file, ":~:.") .. ":" .. mark.line .. ")",
-      ordinal = name .. " " .. (mark.description or "") .. " " .. mark.file,
+      ordinal = name .. " " .. mark.file,
       filename = mark.file,
       lnum = mark.line,
       col = mark.col,
@@ -281,13 +253,9 @@ function M.snacks_marksman()
         vim.fn.fnamemodify(mark.file, ":~:."), 
         tonumber(mark.line) or 1
       ),
-      ordinal = name .. " " .. (mark.description or "") .. " " .. vim.fn.fnamemodify(mark.file, ":t"),
+      ordinal = name .. " " .. vim.fn.fnamemodify(mark.file, ":t"),
       mark_name = name,
     }
-    
-    if mark.description and mark.description ~= "" then
-      entry.display = entry.display .. " - " .. mark.description
-    end
     
     table.insert(results, entry)
   end
@@ -313,16 +281,14 @@ end
 local marksman = require("marksman")
 
 -- Basic operations
-marksman.add_mark("my_mark", "Optional description")
+marksman.add_mark("my_mark")
 marksman.goto_mark("my_mark")
 marksman.goto_mark(1)  -- Jump to first mark by index
 marksman.delete_mark("my_mark")
 marksman.rename_mark("old_name", "new_name")
 
 -- Enhanced features
-marksman.update_mark_description("my_mark", "New description")
 marksman.search_marks("search query")
-marksman.undo_last_deletion()
 marksman.show_marks()
 
 -- Utility functions
@@ -337,7 +303,6 @@ marksman.import_marks()
 ```lua
 local storage = require("marksman.storage")
 
-storage.get_statistics()      -- Get detailed analytics
 storage.validate_marks()      -- Check mark integrity
 storage.get_project_name()    -- Get current project name
 ```
@@ -349,12 +314,9 @@ storage.get_project_name()    -- Get current project name
 | `keymaps` | table | `{...}` | Key mappings for mark operations |
 | `auto_save` | boolean | `true` | Automatically save marks |
 | `max_marks` | number | `100` | Maximum marks per project |
-| `enable_descriptions` | boolean | `true` | Enable mark descriptions |
 | `search_in_ui` | boolean | `true` | Enable search in UI |
-| `undo_levels` | number | `10` | Number of deletions to remember |
 | `sort_marks` | boolean | `true` | Sort marks by access time (false = insertion order) |
-| `sort_marks` | boolean | `true` | Sort marks by access time (false = insertion order) |
-| `minimal` | boolean | `false` | Set to true for clean UI (only order and filename)|
+| `minimal` | boolean | `false` | Set to true for clean UI (only order and filepath)|
 | `highlights` | table | `{...}` | Custom highlight groups |
 
 ### Sorting Behavior
@@ -399,9 +361,11 @@ Marksman uses multiple methods to find your project root:
 ### Search Algorithm
 The search function looks through:
 - Mark names
-- Mark descriptions  
 - File names and paths
 - Code context (the line content)
+
+### File Path Display
+The UI now shows relative file paths instead of just filenames, making it easier to distinguish between files with the same name in different directories.
 
 ## Performance
 
