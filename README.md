@@ -1,5 +1,5 @@
 <p align="center">
-    <img src="assets/marksman.png" alt="marksman.nvim logo" style="width: 420"/>
+  <img src="assets/marksman.png" alt="marksman.nvim logo" width="100%"/>
 </p>
 
 <h1 align="center">Marksman.nvim</h1>
@@ -140,6 +140,7 @@ require("marksman").setup({
    - `r` to rename  
    - `/` to search
    - `J`/`K` to move marks up/down
+   - `C` to clear all marks
 
 ### Advanced Features
 
@@ -171,6 +172,7 @@ The floating window includes:
 - **Enhanced navigation** - Better keyboard shortcuts and visual feedback
 - **File path display** - View relative file paths for better context
 - **Mark reordering** - Press `J`/`K` to move marks up/down
+- **Clear all marks** - Press `C` to clear all marks with confirmation
 
 ## Telescope Integration
 
