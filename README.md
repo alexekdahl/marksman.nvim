@@ -295,7 +295,7 @@ storage.get_project_name()    -- Get current project name
 | `auto_save` | boolean | `true` | Automatically save marks |
 | `max_marks` | number | `100` | Maximum marks per project |
 | `search_in_ui` | boolean | `true` | Enable search in UI |
-| `minimal` | boolean | `false` | Set to true for clean UI (only order and filepath)|
+| `minimal` | boolean | `false` | Set to true for clean UI (number, name, and filepath only)|
 | `silent` | boolean | `false` | Set to true to supress notifications|
 | `highlights` | table | `{...}` | Custom highlight groups |
 
