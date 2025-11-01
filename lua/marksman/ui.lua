@@ -103,7 +103,6 @@ local function create_marks_content(marks, search_query)
 		filtered_names = mark_names
 	end
 
-	-- MINIMAL MODE: Show only order and filepath
 	if config.minimal then
 		if #filtered_names == 0 then
 			table.insert(lines, " No marks")
@@ -113,23 +112,34 @@ local function create_marks_content(marks, search_query)
 		for i, name in ipairs(filtered_names) do
 			local mark = marks[name]
 			local filepath = get_relative_path_display(mark.file)
-			local line = string.format("[%d] %s", i, filepath)
+			local line = string.format("[%d] %s %s", i, name, filepath)
 			table.insert(lines, line)
 
 			local line_idx = #lines - 1
 			mark_info[line_idx] = { name = name, mark = mark, index = i }
 
+			local number_part = string.format("[%d]", i)
+			local name_start = string.len(number_part) + 1
+			local name_end = name_start + string.len(name)
+
 			-- Highlight the number
 			table.insert(highlights, {
 				line = line_idx,
 				col = 0,
-				end_col = string.len(string.format("[%d]", i)),
+				end_col = string.len(number_part),
 				hl_group = "ProjectMarksNumber",
+			})
+			-- Highlight the name
+			table.insert(highlights, {
+				line = line_idx,
+				col = name_start,
+				end_col = name_end,
+				hl_group = "ProjectMarksName",
 			})
 			-- Highlight the filepath
 			table.insert(highlights, {
 				line = line_idx,
-				col = string.len(string.format("[%d] ", i)),
+				col = name_end + 1,
 				end_col = -1,
 				hl_group = "ProjectMarksFile",
 			})
@@ -138,7 +148,6 @@ local function create_marks_content(marks, search_query)
 		return lines, highlights, mark_info
 	end
 
-	-- NORMAL MODE: Full detailed view
 	-- Header
 	local title = search_query
 			and search_query ~= ""
