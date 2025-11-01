@@ -342,15 +342,8 @@ function M.merge_marks(base_marks, new_marks, strategy)
 			if strategy == "replace" or not result[name] then
 				result[name] = mark
 			elseif strategy == "merge" then
-				-- Update existing mark with new data, preserving some fields
-				local existing = result[name]
-				result[name] = vim.tbl_deep_extend("force", existing, mark)
-				-- Preserve original creation time
-				if existing.created_at then
-					result[name].created_at = existing.created_at
-				end
+				result[name] = vim.tbl_deep_extend("force", result[name], mark)
 			end
-			-- "skip_existing" does nothing if mark already exists
 		end
 	end
 

@@ -30,9 +30,8 @@ local default_config = {
 	auto_save = true,
 	max_marks = 100,
 	search_in_ui = true,
-	sort_marks = true,
 	silent = false,
-	minimal = false, -- Set to true for clean UI (only order and filename)
+	minimal = false,
 }
 
 local config = {}
@@ -96,8 +95,6 @@ function M.add_mark(name, description)
 		line = line,
 		col = col,
 		text = vim.fn.getline("."):sub(1, 80),
-		created_at = os.time(),
-		accessed_at = os.time(),
 	}
 
 	local success = storage_module.add_mark(name, mark)
@@ -118,7 +115,7 @@ function M.goto_mark(name_or_index)
 	local mark_name = name_or_index
 
 	if type(name_or_index) == "number" then
-		local mark_names = storage_module.get_sorted_mark_names()
+		local mark_names = storage_module.get_mark_names()
 		if name_or_index > 0 and name_or_index <= #mark_names then
 			mark_name = mark_names[name_or_index]
 			mark = marks[mark_name]
@@ -132,9 +129,6 @@ function M.goto_mark(name_or_index)
 			notify("Mark file no longer exists: " .. mark.file, vim.log.levels.WARN)
 			return false
 		end
-
-		-- Update access time
-		storage_module.update_mark_access(mark_name)
 
 		vim.cmd("edit " .. vim.fn.fnameescape(mark.file))
 		vim.fn.cursor(mark.line, mark.col)
@@ -169,6 +163,19 @@ function M.rename_mark(old_name, new_name)
 		return true
 	else
 		notify("Failed to rename mark", vim.log.levels.WARN)
+		return false
+	end
+end
+
+function M.move_mark(name, direction)
+	local storage_module = get_storage()
+	local success = storage_module.move_mark(name, direction)
+
+	if success then
+		notify("󰃀 Mark moved " .. direction, vim.log.levels.INFO)
+		return true
+	else
+		notify("Cannot move mark " .. direction, vim.log.levels.WARN)
 		return false
 	end
 end

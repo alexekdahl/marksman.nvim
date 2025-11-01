@@ -3,6 +3,7 @@ local M = {}
 
 -- State
 local marks = {}
+local mark_order = {}
 local current_project = nil
 local config = {}
 
@@ -93,21 +94,34 @@ local function load_marks()
 			if #content > 0 then
 				local decoded = vim.json.decode(table.concat(content, "\n"))
 				if decoded and type(decoded) == "table" then
-					marks = decoded
+					marks = decoded.marks or decoded
+					mark_order = decoded.mark_order or {}
+
+					-- If mark_order is missing or incomplete, rebuild it
+					if #mark_order == 0 then
+						mark_order = {}
+						for name in pairs(marks) do
+							table.insert(mark_order, name)
+						end
+					end
 				else
 					marks = {}
+					mark_order = {}
 				end
 			else
 				marks = {}
+				mark_order = {}
 			end
 		end)
 
 		if not ok then
 			notify("Error loading marks: " .. tostring(err), vim.log.levels.ERROR)
 			marks = {}
+			mark_order = {}
 		end
 	else
 		marks = {}
+		mark_order = {}
 	end
 
 	return marks
@@ -124,7 +138,11 @@ local function save_marks()
 	backup_marks_file()
 
 	local ok, err = pcall(function()
-		local json = vim.json.encode(marks)
+		local data = {
+			marks = marks,
+			mark_order = mark_order,
+		}
+		local json = vim.json.encode(data)
 		vim.fn.mkdir(vim.fn.fnamemodify(file, ":h"), "p")
 		vim.fn.writefile({ json }, file)
 	end)
@@ -158,36 +176,15 @@ function M.get_project_name()
 	return vim.fn.fnamemodify(current_project or get_project_root(), ":t")
 end
 
-function M.get_sorted_mark_names()
-	local mark_names = {}
-	local marks_data = M.get_marks()
-
-	for name in pairs(marks_data) do
-		table.insert(mark_names, name)
+function M.get_mark_names()
+	-- Return marks in the order they were added/arranged
+	local valid_names = {}
+	for _, name in ipairs(mark_order) do
+		if marks[name] then
+			table.insert(valid_names, name)
+		end
 	end
-
-	-- Only sort if sorting is enabled
-	if config.sort_marks then
-		table.sort(mark_names, function(a, b)
-			local mark_a = marks_data[a]
-			local mark_b = marks_data[b]
-			-- Sort by access time first, then creation time
-			local time_a = mark_a.accessed_at or mark_a.created_at or 0
-			local time_b = mark_b.accessed_at or mark_b.created_at or 0
-			return time_a > time_b
-		end)
-	else
-		-- When sorting is disabled, maintain insertion order by sorting by creation time ascending
-		table.sort(mark_names, function(a, b)
-			local mark_a = marks_data[a]
-			local mark_b = marks_data[b]
-			local time_a = mark_a.created_at or 0
-			local time_b = mark_b.created_at or 0
-			return time_a < time_b -- Ascending for insertion order
-		end)
-	end
-
-	return mark_names
+	return valid_names
 end
 
 function M.add_mark(name, mark)
@@ -196,6 +193,12 @@ function M.add_mark(name, mark)
 	end
 
 	local marks_data = M.get_marks()
+
+	-- If mark doesn't exist, add it to the order
+	if not marks_data[name] then
+		table.insert(mark_order, name)
+	end
+
 	marks_data[name] = mark
 	return save_marks()
 end
@@ -205,6 +208,15 @@ function M.delete_mark(name)
 
 	if marks_data[name] then
 		marks_data[name] = nil
+
+		-- Remove from order
+		for i, mark_name in ipairs(mark_order) do
+			if mark_name == name then
+				table.remove(mark_order, i)
+				break
+			end
+		end
+
 		return save_marks()
 	end
 
@@ -228,22 +240,56 @@ function M.rename_mark(old_name, new_name)
 
 	marks_data[new_name] = marks_data[old_name]
 	marks_data[old_name] = nil
+
+	-- Update order
+	for i, mark_name in ipairs(mark_order) do
+		if mark_name == old_name then
+			mark_order[i] = new_name
+			break
+		end
+	end
+
 	return save_marks()
 end
 
-function M.update_mark_access(name)
-	local marks_data = M.get_marks()
+function M.move_mark(name, direction)
+	local current_index = nil
 
-	if marks_data[name] then
-		marks_data[name].accessed_at = os.time()
-		return save_marks()
+	-- Find current index
+	for i, mark_name in ipairs(mark_order) do
+		if mark_name == name then
+			current_index = i
+			break
+		end
 	end
 
-	return false
+	if not current_index then
+		return false
+	end
+
+	local new_index
+	if direction == "up" then
+		new_index = current_index - 1
+	elseif direction == "down" then
+		new_index = current_index + 1
+	else
+		return false
+	end
+
+	-- Check bounds
+	if new_index < 1 or new_index > #mark_order then
+		return false
+	end
+
+	-- Swap positions
+	mark_order[current_index], mark_order[new_index] = mark_order[new_index], mark_order[current_index]
+
+	return save_marks()
 end
 
 function M.clear_all_marks()
 	marks = {}
+	mark_order = {}
 	return save_marks()
 end
 
@@ -260,6 +306,7 @@ function M.export_marks()
 		exported_at = os.date("%Y-%m-%d %H:%M:%S"),
 		version = "2.0",
 		marks = marks_data,
+		mark_order = mark_order,
 	}
 
 	local ok, json = pcall(vim.json.encode, export_data)
@@ -317,8 +364,24 @@ function M.import_marks()
 					}, function(choice)
 						if choice == "Replace" then
 							marks = data.marks
+							mark_order = data.mark_order or {}
 						elseif choice == "Merge" then
 							marks = vim.tbl_deep_extend("force", marks_data, data.marks)
+							-- Merge order arrays, avoiding duplicates
+							if data.mark_order then
+								for _, name in ipairs(data.mark_order) do
+									local exists = false
+									for _, existing_name in ipairs(mark_order) do
+										if existing_name == name then
+											exists = true
+											break
+										end
+									end
+									if not exists and marks[name] then
+										table.insert(mark_order, name)
+									end
+								end
+							end
 						else
 							return
 						end
@@ -339,36 +402,6 @@ function M.import_marks()
 			notify("Import failed: " .. tostring(err), vim.log.levels.ERROR)
 		end
 	end)
-end
-
-function M.validate_marks()
-	local marks_data = M.get_marks()
-	local invalid_marks = {}
-
-	for name, mark in pairs(marks_data) do
-		if not mark.file or vim.fn.filereadable(mark.file) == 0 then
-			table.insert(invalid_marks, name)
-		end
-	end
-
-	if #invalid_marks > 0 then
-		vim.ui.select({ "Remove", "Keep", "Show" }, {
-			prompt = string.format("Found %d invalid mark(s). Action:", #invalid_marks),
-		}, function(choice)
-			if choice == "Remove" then
-				for _, name in ipairs(invalid_marks) do
-					M.delete_mark(name)
-				end
-				notify(string.format("Removed %d invalid marks", #invalid_marks), vim.log.levels.INFO)
-			elseif choice == "Show" then
-				notify("Invalid marks: " .. table.concat(invalid_marks, ", "), vim.log.levels.INFO)
-			end
-		end)
-	else
-		notify("All marks are valid", vim.log.levels.INFO)
-	end
-
-	return invalid_marks
 end
 
 return M

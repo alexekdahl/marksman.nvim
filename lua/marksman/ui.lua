@@ -57,27 +57,6 @@ local function get_icon_for_file(filename)
 	return icons[extension] or ""
 end
 
-local function format_time_ago(timestamp)
-	if not timestamp then
-		return "unknown"
-	end
-
-	local now = os.time()
-	local diff = now - timestamp
-
-	if diff < 60 then
-		return "now"
-	elseif diff < 3600 then
-		return math.floor(diff / 60) .. "m ago"
-	elseif diff < 86400 then
-		return math.floor(diff / 3600) .. "h ago"
-	elseif diff < 604800 then
-		return math.floor(diff / 86400) .. "d ago"
-	else
-		return os.date("%m/%d", timestamp)
-	end
-end
-
 local function close_window()
 	if current_window and vim.api.nvim_win_is_valid(current_window) then
 		vim.api.nvim_win_close(current_window, true)
@@ -103,55 +82,36 @@ local function create_marks_content(marks, search_query)
 	local highlights = {}
 	local mark_info = {} -- Store mark data for each line
 
+	-- Get ordered mark names from storage
+	local storage = require("marksman.storage")
+	local mark_names = storage.get_mark_names()
+
 	-- Filter marks if search query provided
-	local filtered_marks = {}
+	local filtered_names = {}
 	if search_query and search_query ~= "" then
 		search_query = search_query:lower()
-		for name, mark in pairs(marks) do
-			local searchable = (name .. " " .. vim.fn.fnamemodify(mark.file, ":t") .. " " .. (mark.text or "")):lower()
-			if searchable:find(search_query, 1, true) then
-				filtered_marks[name] = mark
+		for _, name in ipairs(mark_names) do
+			local mark = marks[name]
+			if mark then
+				local searchable = (name .. " " .. vim.fn.fnamemodify(mark.file, ":t") .. " " .. (mark.text or "")):lower()
+				if searchable:find(search_query, 1, true) then
+					table.insert(filtered_names, name)
+				end
 			end
 		end
 	else
-		filtered_marks = marks
-	end
-
-	-- Sort marks
-	local mark_names = {}
-	for name in pairs(filtered_marks) do
-		table.insert(mark_names, name)
-	end
-
-	-- Only sort if sorting is enabled in config
-	if config.sort_marks then
-		table.sort(mark_names, function(a, b)
-			local mark_a = filtered_marks[a]
-			local mark_b = filtered_marks[b]
-			local time_a = mark_a.accessed_at or mark_a.created_at or 0
-			local time_b = mark_b.accessed_at or mark_b.created_at or 0
-			return time_a > time_b
-		end)
-	else
-		-- When sorting is disabled, maintain insertion order (oldest first)
-		table.sort(mark_names, function(a, b)
-			local mark_a = filtered_marks[a]
-			local mark_b = filtered_marks[b]
-			local time_a = mark_a.created_at or 0
-			local time_b = mark_b.created_at or 0
-			return time_a < time_b
-		end)
+		filtered_names = mark_names
 	end
 
 	-- MINIMAL MODE: Show only order and filepath
 	if config.minimal then
-		if vim.tbl_isempty(filtered_marks) then
+		if #filtered_names == 0 then
 			table.insert(lines, " No marks")
 			return lines, highlights, {}
 		end
 
-		for i, name in ipairs(mark_names) do
-			local mark = filtered_marks[name]
+		for i, name in ipairs(filtered_names) do
+			local mark = marks[name]
 			local filepath = get_relative_path_display(mark.file)
 			local line = string.format("[%d] %s", i, filepath)
 			table.insert(lines, line)
@@ -190,7 +150,7 @@ local function create_marks_content(marks, search_query)
 
 	-- Stats line
 	local total_marks = vim.tbl_count(marks)
-	local shown_marks = vim.tbl_count(filtered_marks)
+	local shown_marks = #filtered_names
 	local stats_line = string.format(" Showing %d of %d marks", shown_marks, total_marks)
 	table.insert(lines, stats_line)
 	table.insert(highlights, { line = 2, col = 0, end_col = -1, hl_group = "ProjectMarksHelp" })
@@ -199,7 +159,7 @@ local function create_marks_content(marks, search_query)
 	-- Help text
 	local help_lines = {
 		" <CR>/1-9: Jump  d: Delete  r: Rename  /: Search",
-		" v: Validate  q: Close",
+		" J/K: Move up/down  q: Close",
 	}
 	for _, help_line in ipairs(help_lines) do
 		table.insert(lines, help_line)
@@ -207,7 +167,7 @@ local function create_marks_content(marks, search_query)
 	end
 	table.insert(lines, "")
 
-	if vim.tbl_isempty(filtered_marks) then
+	if #filtered_names == 0 then
 		local no_marks_line = search_query and search_query ~= "" and " No marks found matching search"
 			or " No marks in this project"
 		table.insert(lines, no_marks_line)
@@ -215,16 +175,14 @@ local function create_marks_content(marks, search_query)
 		return lines, highlights, {}
 	end
 
-	for i, name in ipairs(mark_names) do
-		local mark = filtered_marks[name]
+	for i, name in ipairs(filtered_names) do
+		local mark = marks[name]
 		local icon = get_icon_for_file(mark.file)
 		local rel_path = get_relative_path_display(mark.file)
-		local time_str = format_time_ago(mark.accessed_at or mark.created_at)
 
 		local number = string.format("[%d]", i)
 		local name_part = icon .. " " .. name
 		local file_part = rel_path .. ":" .. mark.line
-		local time_part = "(" .. time_str .. ")"
 
 		-- Main line with mark name
 		local line = string.format("%s %s", number, name_part)
@@ -260,7 +218,7 @@ local function create_marks_content(marks, search_query)
 		})
 
 		-- File info
-		local info = string.format("   └─ %s %s", file_part, time_part)
+		local info = string.format("   └─ %s", file_part)
 		table.insert(lines, info)
 		table.insert(highlights, {
 			line = #lines - 1,
@@ -314,7 +272,10 @@ local function setup_window_keymaps(buf, marks, project_name, mark_info, search_
 		if mark_info_item then
 			local marksman = require("marksman")
 			marksman.delete_mark(mark_info_item.name)
-			refresh_window(search_query)
+			-- Force immediate refresh
+			vim.schedule(function()
+				refresh_window(search_query)
+			end)
 		end
 	end
 
@@ -334,6 +295,15 @@ local function setup_window_keymaps(buf, marks, project_name, mark_info, search_
 		end
 	end
 
+	local function move_selected(direction)
+		local mark_info_item = get_mark_under_cursor(mark_info)
+		if mark_info_item then
+			local marksman = require("marksman")
+			marksman.move_mark(mark_info_item.name, direction)
+			refresh_window(search_query)
+		end
+	end
+
 	local function search_marks()
 		vim.ui.input({
 			prompt = "Search: ",
@@ -343,11 +313,6 @@ local function setup_window_keymaps(buf, marks, project_name, mark_info, search_
 				refresh_window(query)
 			end
 		end)
-	end
-
-	local function validate_marks()
-		local storage = require("marksman.storage")
-		storage.validate_marks()
 	end
 
 	local keymap_opts = { buffer = buf, noremap = true, silent = true }
@@ -361,7 +326,14 @@ local function setup_window_keymaps(buf, marks, project_name, mark_info, search_
 	vim.keymap.set("n", "d", delete_selected, keymap_opts)
 	vim.keymap.set("n", "r", rename_selected, keymap_opts)
 	vim.keymap.set("n", "/", search_marks, keymap_opts)
-	vim.keymap.set("n", "v", validate_marks, keymap_opts)
+
+	-- Reordering
+	vim.keymap.set("n", "J", function()
+		move_selected("down")
+	end, keymap_opts)
+	vim.keymap.set("n", "K", function()
+		move_selected("up")
+	end, keymap_opts)
 
 	-- Number key navigation
 	for i = 1, 9 do
