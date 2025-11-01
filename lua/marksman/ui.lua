@@ -168,7 +168,7 @@ local function create_marks_content(marks, search_query)
 	-- Help text
 	local help_lines = {
 		" <CR>/1-9: Jump  d: Delete  r: Rename  /: Search",
-		" J/K: Move up/down  q: Close",
+		" J/K: Move up/down  C: Clear all  q: Close",
 	}
 	for _, help_line in ipairs(help_lines) do
 		table.insert(lines, help_line)
@@ -324,6 +324,18 @@ local function setup_window_keymaps(buf, marks, project_name, mark_info, search_
 		end)
 	end
 
+	local function clear_all_marks()
+		vim.ui.select({ "Yes", "No" }, {
+			prompt = "Clear all marks in this project?",
+		}, function(choice)
+			if choice == "Yes" then
+				local marksman = require("marksman")
+				marksman.clear_all_marks()
+				close_window()
+			end
+		end)
+	end
+
 	local keymap_opts = { buffer = buf, noremap = true, silent = true }
 
 	-- Basic navigation
@@ -335,6 +347,7 @@ local function setup_window_keymaps(buf, marks, project_name, mark_info, search_
 	vim.keymap.set("n", "d", delete_selected, keymap_opts)
 	vim.keymap.set("n", "r", rename_selected, keymap_opts)
 	vim.keymap.set("n", "/", search_marks, keymap_opts)
+	vim.keymap.set("n", "C", clear_all_marks, keymap_opts)
 
 	-- Reordering
 	vim.keymap.set("n", "J", function()
