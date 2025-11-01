@@ -1,5 +1,5 @@
 <p align="center">
-  <img src="assets/marksman.png" alt="marksman.nvim logo" width="420"/>
+    <img src="assets/marksman.png" alt="marksman.nvim logo" style="width: 420"/>
 </p>
 
 <h1 align="center">Marksman.nvim</h1>
