@@ -3,6 +3,7 @@ local M = {}
 
 local config = {}
 local current_window = nil
+local current_buffer = nil
 
 -- Helper function for conditional notifications
 local function notify(message, level)
