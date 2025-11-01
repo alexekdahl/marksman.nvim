@@ -17,10 +17,10 @@ Vim's built-in marks are great, but they're global and get messy fast. Marksman 
 - **Project-scoped marks** - Each project gets its own isolated set of bookmarks
 - **Persistent storage** - Your marks survive Neovim restarts with automatic backup
 - **Smart naming** - Context-aware auto-generation of mark names based on code structure
-- **Quick access** - Jump to your most recent marks with single keys
+- **Quick access** - Jump to your marks with single keys
 - **Enhanced search** - Find marks by name, file path, or content
-- **Validation** - Check and clean up marks pointing to non-existent files
 - **Interactive UI** - Browse and manage marks in an enhanced floating window
+- **Reordering** - Move marks up and down to organize them as needed
 - **Multiple integrations** - Works with Telescope, Snacks.nvim, and more
 
 ## Requirements
@@ -55,7 +55,6 @@ Vim's built-in marks are great, but they're global and get messy fast. Marksman 
     auto_save = true,
     max_marks = 100,
     search_in_ui = true,
-    sort_marks = true,
     silent = false,
     minimal = false,
   },
@@ -120,13 +119,13 @@ require("marksman").setup({
 
 1. **Add a mark**: Press `<C-a>` (or your custom key) 
 2. **See your marks**: Press `<C-e>` to open the marks window
-3. **Jump around**: Use `<M-y>`, `<M-u>`, etc. to jump to recent marks
+3. **Jump around**: Use `<M-y>`, `<M-u>`, etc. to jump to marks
 4. **In the marks window**: 
    - Press Enter or 1-9 to jump
    - `d` to delete
    - `r` to rename  
    - `/` to search
-   - `v` to validate marks
+   - `J`/`K` to move marks up/down
 
 ### Advanced Features
 
@@ -157,7 +156,7 @@ The floating window includes:
 - **Real-time search** - Press `/` to filter marks instantly
 - **Enhanced navigation** - Better keyboard shortcuts and visual feedback
 - **File path display** - View relative file paths for better context
-- **Validation** - Press `v` to check mark integrity
+- **Mark reordering** - Press `J`/`K` to move marks up/down
 
 ## Telescope Integration
 
@@ -192,15 +191,6 @@ local function telescope_marksman()
       col = mark.col,
     })
   end
-  
-  -- Sort by access time
-  table.sort(entries, function(a, b)
-    local mark_a = marks[a.value]
-    local mark_b = marks[b.value]
-    local time_a = mark_a.accessed_at or mark_a.created_at or 0
-    local time_b = mark_b.accessed_at or mark_b.created_at or 0
-    return time_a > time_b
-  end)
   
   pickers.new({}, {
     prompt_title = "Project Marks",
@@ -260,15 +250,6 @@ function M.snacks_marksman()
     table.insert(results, entry)
   end
   
-  -- Sort by access time
-  table.sort(results, function(a, b)
-    local mark_a = marks[a.mark_name]
-    local mark_b = marks[b.mark_name]
-    local time_a = mark_a.accessed_at or mark_a.created_at or 0
-    local time_b = mark_b.accessed_at or mark_b.created_at or 0
-    return time_a > time_b
-  end)
-  
   return results
 end
 ```
@@ -303,7 +284,6 @@ marksman.import_marks()
 ```lua
 local storage = require("marksman.storage")
 
-storage.validate_marks()      -- Check mark integrity
 storage.get_project_name()    -- Get current project name
 ```
 
@@ -315,29 +295,9 @@ storage.get_project_name()    -- Get current project name
 | `auto_save` | boolean | `true` | Automatically save marks |
 | `max_marks` | number | `100` | Maximum marks per project |
 | `search_in_ui` | boolean | `true` | Enable search in UI |
-| `sort_marks` | boolean | `true` | Sort marks by access time (false = insertion order) |
 | `minimal` | boolean | `false` | Set to true for clean UI (only order and filepath)|
 | `silent` | boolean | `false` | Set to true to supress notifications|
 | `highlights` | table | `{...}` | Custom highlight groups |
-
-### Sorting Behavior
-By default (`sort_marks = true`), marks are sorted by:
-1. **Access time** (when you last jumped to the mark)
-2. **Creation time** (when the mark was created)
-
-This means recently used marks appear first, making them easier to access.
-
-When `sort_marks = false`:
-- Marks maintain their **insertion order** (oldest marks first)
-- Quick access keys (`goto_1`, `goto_2`, etc.) will jump to marks in the order they were created
-- Useful if you prefer predictable, stable ordering
-
-```lua
--- Example: Disable sorting to keep insertion order
-require("marksman").setup({
-  sort_marks = false,  -- Marks stay in creation order
-})
-```
 
 ## How it works
 
@@ -366,7 +326,7 @@ The search function looks through:
 - Code context (the line content)
 
 ### File Path Display
-The UI now shows relative file paths instead of just filenames, making it easier to distinguish between files with the same name in different directories.
+The UI shows relative file paths instead of just filenames, making it easier to distinguish between files with the same name in different directories.
 
 ## Performance
 
