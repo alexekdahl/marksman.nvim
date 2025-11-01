@@ -32,6 +32,7 @@ local default_config = {
 	search_in_ui = true,
 	silent = false,
 	minimal = false,
+	disable_default_keymaps = false,
 }
 
 local config = {}
@@ -304,7 +305,7 @@ function M.setup(opts)
 	end
 
 	-- Set keymaps if not disabled
-	if config.keymaps ~= false then
+	if not config.disable_default_keymaps and config.keymaps ~= false then
 		local keymaps = config.keymaps
 
 		if keymaps.add then

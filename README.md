@@ -57,6 +57,7 @@ Vim's built-in marks are great, but they're global and get messy fast. Marksman 
     search_in_ui = true,
     silent = false,
     minimal = false,
+    disable_default_keymaps = false,
   },
 }
 ```
@@ -77,6 +78,7 @@ require("marksman").setup({
   },
   auto_save = true,
   max_marks = 100,
+  disable_default_keymaps = false,
 })
 ```
 
@@ -93,6 +95,18 @@ require("marksman").setup({
     goto_4 = "<leader>m4",
   },
 })
+```
+
+### Disable Default Keymaps
+
+```lua
+require("marksman").setup({
+  disable_default_keymaps = true,
+})
+
+-- Set your own keymaps manually
+vim.keymap.set("n", "<leader>ma", require("marksman").add_mark)
+vim.keymap.set("n", "<leader>ms", require("marksman").show_marks)
 ```
 
 ### Custom Highlights
@@ -297,6 +311,7 @@ storage.get_project_name()    -- Get current project name
 | `search_in_ui` | boolean | `true` | Enable search in UI |
 | `minimal` | boolean | `false` | Set to true for clean UI (number, name, and filepath only)|
 | `silent` | boolean | `false` | Set to true to supress notifications|
+| `disable_default_keymaps` | boolean | `false` | Set to true to disable all default keymaps |
 | `highlights` | table | `{...}` | Custom highlight groups |
 
 ## How it works
