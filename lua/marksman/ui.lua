@@ -46,6 +46,10 @@ local file_icons = {
 	bash = "󰘳",
 }
 
+-- Fixed window dimensions
+local WINDOW_WIDTH = 80
+local WINDOW_HEIGHT = 20
+
 ---Helper function for conditional notifications
 ---@param message string The notification message
 ---@param level number The log level
@@ -57,7 +61,24 @@ end
 
 ---Setup highlight groups
 local function setup_highlights()
-	for name, attrs in pairs(config.highlights or {}) do
+	-- Set up default highlights
+	local default_highlights = {
+		ProjectMarksTitle = { fg = "#61AFEF", bold = true },
+		ProjectMarksNumber = { fg = "#C678DD" },
+		ProjectMarksName = { fg = "#98C379", bold = true },
+		ProjectMarksFile = { fg = "#56B6C2" },
+		ProjectMarksLine = { fg = "#D19A66" },
+		ProjectMarksText = { fg = "#5C6370", italic = true },
+		ProjectMarksHelp = { fg = "#5C6370" }, -- Dimmed for help text
+		ProjectMarksBorder = { fg = "#5A5F8C" },
+		ProjectMarksSearch = { fg = "#E5C07B" },
+		ProjectMarksSeparator = { fg = "#3E4451" }, -- For separator line
+	}
+
+	-- Merge with user config
+	local highlights = vim.tbl_deep_extend("force", default_highlights, config.highlights or {})
+
+	for name, attrs in pairs(highlights) do
 		vim.api.nvim_set_hl(0, name, attrs)
 	end
 end
@@ -86,7 +107,7 @@ local function get_relative_path_display(filepath)
 	local rel_path = vim.fn.fnamemodify(filepath, ":~:.")
 
 	-- If path is too long, show parent directory + filename
-	if #rel_path > 50 then
+	if #rel_path > 40 then
 		local parent = vim.fn.fnamemodify(filepath, ":h:t")
 		local filename = vim.fn.fnamemodify(filepath, ":t")
 		return parent .. "/" .. filename
@@ -111,24 +132,15 @@ local function create_header_content(total_marks, shown_marks, search_query)
 		or " 󰃀 Project Marks "
 	table.insert(lines, title)
 	table.insert(highlights, { line = 0, col = 0, end_col = -1, hl_group = "ProjectMarksTitle" })
-	table.insert(lines, "")
 
-	-- Stats
+	-- Stats line
 	local stats_line = string.format(" Showing %d of %d marks", shown_marks, total_marks)
 	table.insert(lines, stats_line)
-	table.insert(highlights, { line = 2, col = 0, end_col = -1, hl_group = "ProjectMarksHelp" })
-	table.insert(lines, "")
+	table.insert(highlights, { line = 1, col = 0, end_col = -1, hl_group = "ProjectMarksFile" })
 
-	-- Help text
-	local help_lines = {
-		" <CR>/1-9: Jump  d: Delete  r: Rename  /: Search",
-		" J/K: Move up/down  C: Clear all  q: Close",
-	}
-	for _, help_line in ipairs(help_lines) do
-		table.insert(lines, help_line)
-		table.insert(highlights, { line = #lines - 1, col = 0, end_col = -1, hl_group = "ProjectMarksHelp" })
-	end
-	table.insert(lines, "")
+	-- Separator
+	table.insert(lines, string.rep("─", WINDOW_WIDTH - 2))
+	table.insert(highlights, { line = 2, col = 0, end_col = -1, hl_group = "ProjectMarksSeparator" })
 
 	return lines, highlights
 end
@@ -142,22 +154,26 @@ end
 ---@return table highlights Array of highlight definitions for this line
 local function create_minimal_mark_line(name, mark, index, line_idx)
 	local filepath = get_relative_path_display(mark.file)
-	local line = string.format("[%d] %s %s", index, name, filepath)
+	local line = string.format(" [%d] %-20s %s", index, name:sub(1, 20), filepath)
+
+	-- Ensure line doesn't exceed window width
+	if #line > WINDOW_WIDTH - 2 then
+		line = line:sub(1, WINDOW_WIDTH - 5) .. "..."
+	end
 
 	local highlights = {}
-	local number_part = string.format("[%d]", index)
-	local name_start = #number_part + 1
-	local name_end = name_start + #name
 
 	-- Number highlight
 	table.insert(highlights, {
 		line = line_idx,
-		col = 0,
-		end_col = #number_part,
+		col = 1,
+		end_col = 4 + #tostring(index),
 		hl_group = "ProjectMarksNumber",
 	})
 
 	-- Name highlight
+	local name_start = 5 + #tostring(index)
+	local name_end = name_start + math.min(20, #name)
 	table.insert(highlights, {
 		line = line_idx,
 		col = name_start,
@@ -189,53 +205,67 @@ local function create_detailed_mark_lines(name, mark, index, line_idx)
 	local icon = get_icon_for_file(mark.file)
 	local rel_path = get_relative_path_display(mark.file)
 
+	-- Format: [1] icon name
 	local number = string.format("[%d]", index)
-	local name_part = icon .. " " .. name
-	local file_part = rel_path .. ":" .. mark.line
+	local name_display = name:sub(1, 30)
+	local main_line = string.format(" %s %s %s", number, icon, name_display)
 
-	-- Main line with mark name
-	local main_line = string.format("%s %s", number, name_part)
+	-- Ensure line doesn't exceed window width
+	if #main_line > WINDOW_WIDTH - 2 then
+		main_line = main_line:sub(1, WINDOW_WIDTH - 5) .. "..."
+	end
+
 	table.insert(lines, main_line)
 
+	-- Highlights for main line
 	table.insert(highlights, {
 		line = line_idx,
-		col = 0,
-		end_col = #number,
+		col = 1,
+		end_col = 1 + #number,
 		hl_group = "ProjectMarksNumber",
 	})
 	table.insert(highlights, {
 		line = line_idx,
-		col = #number + 1,
-		end_col = #number + 1 + #name_part,
+		col = 1 + #number + 1,
+		end_col = -1,
 		hl_group = "ProjectMarksName",
 	})
 
-	-- Preview text
-	local preview = "   │ " .. (mark.text or ""):gsub("^%s+", ""):gsub("%s+$", "")
-	if #preview > 80 then
-		preview = preview:sub(1, 77) .. "..."
+	-- File info on second line
+	local file_info = string.format("    %s:%d", rel_path, mark.line)
+	if #file_info > WINDOW_WIDTH - 2 then
+		file_info = file_info:sub(1, WINDOW_WIDTH - 5) .. "..."
 	end
-	table.insert(lines, preview)
+
+	table.insert(lines, file_info)
 	table.insert(highlights, {
 		line = line_idx + 1,
-		col = 0,
+		col = 4,
 		end_col = -1,
-		hl_group = "ProjectMarksText",
-	})
-
-	-- File info
-	local info = string.format("   └─ %s", file_part)
-	table.insert(lines, info)
-	table.insert(highlights, {
-		line = line_idx + 2,
-		col = 6,
-		end_col = 6 + #file_part,
 		hl_group = "ProjectMarksFile",
 	})
 
-	table.insert(lines, "")
-
 	return lines, highlights
+end
+
+---Create help text for the bottom of the window
+---@return string help_line The help text line
+local function create_help_line()
+	local help_items = {
+		"<CR>/1-9:Jump",
+		"d:Delete",
+		"r:Rename",
+		"/:Search",
+		"J/K:Move",
+		"C:Clear",
+		"q:Close",
+	}
+
+	local help_text = table.concat(help_items, "  ")
+	local padding = math.max(0, WINDOW_WIDTH - #help_text - 2)
+	local left_pad = math.floor(padding / 2)
+
+	return string.rep(" ", left_pad) .. help_text
 end
 
 ---Create complete marks window content
@@ -270,29 +300,6 @@ local function create_marks_content(marks, search_query)
 	local total_marks = vim.tbl_count(marks)
 	local shown_marks = #filtered_names
 
-	-- Handle minimal mode
-	if config.minimal then
-		if shown_marks == 0 then
-			table.insert(lines, " No marks")
-			return lines, highlights, {}
-		end
-
-		for i, name in ipairs(filtered_names) do
-			local mark = marks[name]
-			local line_idx = #lines
-			local line, line_highlights = create_minimal_mark_line(name, mark, i, line_idx)
-
-			table.insert(lines, line)
-			mark_info[line_idx] = { name = name, mark = mark, index = i }
-
-			for _, hl in ipairs(line_highlights) do
-				table.insert(highlights, hl)
-			end
-		end
-
-		return lines, highlights, mark_info
-	end
-
 	-- Create header
 	local header_lines, header_highlights = create_header_content(total_marks, shown_marks, search_query)
 	for _, line in ipairs(header_lines) do
@@ -302,30 +309,97 @@ local function create_marks_content(marks, search_query)
 		table.insert(highlights, hl)
 	end
 
+	-- Calculate available space for marks
+	local header_height = #header_lines
+	local footer_height = 2 -- Separator + help line
+	local available_height = WINDOW_HEIGHT - header_height - footer_height - 2
+
 	-- Handle no marks case
 	if shown_marks == 0 then
 		local no_marks_line = search_query and search_query ~= "" and " No marks found matching search"
 			or " No marks in this project"
+		table.insert(lines, "")
 		table.insert(lines, no_marks_line)
 		table.insert(highlights, { line = #lines - 1, col = 0, end_col = -1, hl_group = "ProjectMarksText" })
-		return lines, highlights, {}
+
+		-- Fill empty space
+		while #lines < WINDOW_HEIGHT - footer_height - 1 do
+			table.insert(lines, "")
+		end
+	else
+		-- Create mark entries
+		local current_line = #lines
+		local marks_added = 0
+
+		if config.minimal then
+			-- Minimal mode - one line per mark
+			for i, name in ipairs(filtered_names) do
+				if marks_added >= available_height then
+					break
+				end
+
+				local mark = marks[name]
+				local line_idx = current_line + marks_added
+				local line, line_highlights = create_minimal_mark_line(name, mark, i, line_idx)
+
+				table.insert(lines, line)
+				mark_info[line_idx] = { name = name, mark = mark, index = i }
+
+				for _, hl in ipairs(line_highlights) do
+					table.insert(highlights, hl)
+				end
+
+				marks_added = marks_added + 1
+			end
+		else
+			-- Detailed mode - two lines per mark
+			for i, name in ipairs(filtered_names) do
+				if marks_added + 2 > available_height then
+					break
+				end
+
+				local mark = marks[name]
+				local start_line_idx = current_line + marks_added
+				local mark_lines, mark_highlights = create_detailed_mark_lines(name, mark, i, start_line_idx)
+
+				mark_info[start_line_idx] = { name = name, mark = mark, index = i }
+
+				for _, line in ipairs(mark_lines) do
+					table.insert(lines, line)
+				end
+				for _, hl in ipairs(mark_highlights) do
+					table.insert(highlights, hl)
+				end
+
+				marks_added = marks_added + #mark_lines
+			end
+		end
+
+		-- Fill remaining space
+		while #lines < WINDOW_HEIGHT - footer_height - 1 do
+			table.insert(lines, "")
+		end
+
+		-- Add "..." indicator if there are more marks
+		local displayed_count = config.minimal and marks_added or math.floor(marks_added / 2)
+		if displayed_count < shown_marks then
+			lines[#lines] = string.format(" ... and %d more marks", shown_marks - displayed_count)
+			table.insert(highlights, {
+				line = #lines - 1,
+				col = 0,
+				end_col = -1,
+				hl_group = "ProjectMarksText",
+			})
+		end
 	end
 
-	-- Create detailed mark entries
-	for i, name in ipairs(filtered_names) do
-		local mark = marks[name]
-		local start_line_idx = #lines
-		local mark_lines, mark_highlights = create_detailed_mark_lines(name, mark, i, start_line_idx)
+	-- Add separator before help
+	table.insert(lines, string.rep("─", WINDOW_WIDTH - 2))
+	table.insert(highlights, { line = #lines - 1, col = 0, end_col = -1, hl_group = "ProjectMarksSeparator" })
 
-		mark_info[start_line_idx] = { name = name, mark = mark, index = i }
-
-		for _, line in ipairs(mark_lines) do
-			table.insert(lines, line)
-		end
-		for _, hl in ipairs(mark_highlights) do
-			table.insert(highlights, hl)
-		end
-	end
+	-- Add help line
+	table.insert(lines, create_help_line())
+	table.insert(highlights, { line = #lines - 1, col = 0, end_col = -1, hl_group = "ProjectMarksHelp" })
 
 	return lines, highlights, mark_info
 end
@@ -344,6 +418,11 @@ local function get_mark_under_cursor(mark_info)
 			closest_distance = distance
 			closest_mark = info
 		end
+	end
+
+	-- Don't return mark if cursor is too far (e.g., on help text)
+	if closest_distance > 3 then
+		return nil
 	end
 
 	return closest_mark
@@ -415,7 +494,17 @@ local function setup_window_keymaps(buf, marks, project_name, mark_info, search_
 			local marksman = require("marksman")
 			local result = marksman.move_mark(mark_info_item.name, direction)
 			if result.success then
+				-- Save cursor position
+				local cursor_line = vim.fn.line(".")
 				refresh_window(search_query)
+				-- Try to restore cursor position
+				vim.schedule(function()
+					if direction == "up" and cursor_line > 4 then
+						vim.fn.cursor(cursor_line - 1, 1)
+					elseif direction == "down" and cursor_line < WINDOW_HEIGHT - 3 then
+						vim.fn.cursor(cursor_line + 1, 1)
+					end
+				end)
 			else
 				notify(result.message, vim.log.levels.WARN)
 			end
@@ -485,30 +574,6 @@ local function setup_window_keymaps(buf, marks, project_name, mark_info, search_
 	end
 end
 
----Calculate optimal window dimensions
----@param content_lines table Array of content lines
----@return table dimensions Window dimensions and position
-local function calculate_window_dimensions(content_lines)
-	local max_width = 120
-	local max_height = vim.o.lines - 6
-
-	-- Calculate content width
-	local content_width = 0
-	for _, line in ipairs(content_lines) do
-		content_width = math.max(content_width, vim.fn.strdisplaywidth(line))
-	end
-
-	local width = math.min(math.max(content_width + 4, 60), max_width)
-	local height = math.min(#content_lines + 2, max_height)
-
-	return {
-		width = width,
-		height = height,
-		row = (vim.o.lines - height) / 2,
-		col = (vim.o.columns - width) / 2,
-	}
-end
-
 -- Public API
 
 ---Setup the UI module
@@ -558,8 +623,9 @@ function M.show_marks_window(marks, project_name, search_query)
 		pcall(vim.api.nvim_buf_add_highlight, buf, -1, hl.hl_group, hl.line, hl.col, hl.end_col)
 	end
 
-	-- Calculate window dimensions
-	local dimensions = calculate_window_dimensions(lines)
+	-- Calculate window position (centered)
+	local row = math.floor((vim.o.lines - WINDOW_HEIGHT) / 2)
+	local col = math.floor((vim.o.columns - WINDOW_WIDTH) / 2)
 
 	-- Window title
 	local title = " " .. (project_name or "Project") .. " "
@@ -570,10 +636,10 @@ function M.show_marks_window(marks, project_name, search_query)
 	-- Window options
 	local opts = {
 		relative = "editor",
-		width = dimensions.width,
-		height = dimensions.height,
-		row = dimensions.row,
-		col = dimensions.col,
+		width = WINDOW_WIDTH,
+		height = WINDOW_HEIGHT,
+		row = row,
+		col = col,
 		border = "rounded",
 		style = "minimal",
 		title = title,
@@ -609,6 +675,9 @@ function M.show_marks_window(marks, project_name, search_query)
 		if first_mark_line ~= math.huge then
 			pcall(vim.fn.cursor, first_mark_line + 1, 1) -- +1 for 1-indexed
 		end
+	else
+		-- Position cursor on first content line after header
+		pcall(vim.fn.cursor, 4, 1)
 	end
 end
 

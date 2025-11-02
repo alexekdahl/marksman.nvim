@@ -176,6 +176,70 @@ local naming_patterns = {
 	},
 }
 
+-- Treesitter node type mappings
+local treesitter_node_mappings = {
+	-- Lua
+	lua = {
+		["function_declaration"] = { type = "function", name_field = "name" },
+		["local_function_declaration"] = { type = "function", name_field = "name" },
+		["function_definition"] = { type = "function", name_field = "name" },
+		["method"] = { type = "method", name_field = "name" },
+		["variable_declaration"] = { type = "variable", name_field = "name" },
+	},
+	-- JavaScript/TypeScript
+	javascript = {
+		["function_declaration"] = { type = "function", name_field = "name" },
+		["class_declaration"] = { type = "class", name_field = "name" },
+		["method_definition"] = { type = "method", name_field = "name" },
+		["arrow_function"] = { type = "arrow_function", parent_name = true },
+		["lexical_declaration"] = { type = "variable", name_field = "name" },
+		["variable_declaration"] = { type = "variable", name_field = "declarator.name" },
+	},
+	typescript = {
+		["function_declaration"] = { type = "function", name_field = "name" },
+		["class_declaration"] = { type = "class", name_field = "name" },
+		["method_definition"] = { type = "method", name_field = "name" },
+		["arrow_function"] = { type = "arrow_function", parent_name = true },
+		["interface_declaration"] = { type = "interface", name_field = "name" },
+		["type_alias_declaration"] = { type = "type", name_field = "name" },
+	},
+	-- Python
+	python = {
+		["function_definition"] = { type = "function", name_field = "name" },
+		["class_definition"] = { type = "class", name_field = "name" },
+		["assignment"] = { type = "variable", name_field = "left" },
+	},
+	-- Go
+	go = {
+		["function_declaration"] = { type = "function", name_field = "name" },
+		["method_declaration"] = { type = "method", name_field = "name" },
+		["type_declaration"] = { type = "type", name_field = "type_spec.name" },
+		["struct_type"] = { type = "struct", parent_name = true },
+		["interface_type"] = { type = "interface", parent_name = true },
+	},
+	-- Rust
+	rust = {
+		["function_item"] = { type = "function", name_field = "name" },
+		["struct_item"] = { type = "struct", name_field = "name" },
+		["enum_item"] = { type = "enum", name_field = "name" },
+		["trait_item"] = { type = "trait", name_field = "name" },
+		["impl_item"] = { type = "impl", name_field = "type" },
+	},
+	-- C/C++
+	c = {
+		["function_definition"] = { type = "function", name_field = "declarator" },
+		["struct_specifier"] = { type = "struct", name_field = "name" },
+		["enum_specifier"] = { type = "enum", name_field = "name" },
+		["declaration"] = { type = "variable", name_field = "declarator" },
+	},
+	cpp = {
+		["function_definition"] = { type = "function", name_field = "declarator" },
+		["class_specifier"] = { type = "class", name_field = "name" },
+		["struct_specifier"] = { type = "struct", name_field = "name" },
+		["enum_specifier"] = { type = "enum", name_field = "name" },
+	},
+}
+
 ---Get file extension from filename
 ---@param filename string File path
 ---@return string extension File extension in lowercase
@@ -183,7 +247,113 @@ local function get_file_extension(filename)
 	return vim.fn.fnamemodify(filename, ":e"):lower()
 end
 
----Extract context information from a line of code
+---Extract identifier from a treesitter node
+---@param node table Treesitter node
+---@param mapping table Node type mapping info
+---@return string|nil identifier Extracted identifier
+local function extract_identifier_from_node(node, mapping)
+	if not node or not mapping then
+		return nil
+	end
+
+	-- Handle parent_name flag - get parent's name field
+	if mapping.parent_name then
+		local parent = node:parent()
+		if parent then
+			-- Try to find a name field in parent
+			for _, field in ipairs(parent:field_names()) do
+				if field:match("name") then
+					local name_node = parent:field(field)[1]
+					if name_node then
+						return vim.treesitter.get_node_text(name_node, 0)
+					end
+				end
+			end
+		end
+		return nil
+	end
+
+	-- Handle nested field names (e.g., "declarator.name")
+	local field_parts = vim.split(mapping.name_field or "", "%.")
+	local current_node = node
+
+	for _, field_name in ipairs(field_parts) do
+		if not current_node then
+			return nil
+		end
+
+		local child_node = current_node:field(field_name)[1]
+		if not child_node then
+			-- Try direct child by type
+			for child in current_node:iter_children() do
+				if child:type() == field_name then
+					current_node = child
+					break
+				else
+					current_node = nil
+				end
+			end
+		else
+			current_node = child_node
+		end
+	end
+
+	if current_node then
+		local text = vim.treesitter.get_node_text(current_node, 0)
+		-- Clean up the text (remove qualifiers, etc.)
+		return text:match("([%w_]+)")
+	end
+
+	return nil
+end
+
+---Get context from treesitter
+---@param line_num number Line number (1-indexed)
+---@return string|nil identifier Extracted identifier
+---@return string|nil type Type of identifier
+local function get_context_from_treesitter(line_num)
+	-- Check if treesitter is available
+	local ok, parser = pcall(vim.treesitter.get_parser)
+	if not ok or not parser then
+		return nil
+	end
+
+	-- Get language and check if we have mappings
+	local lang = parser:lang()
+	local lang_mappings = treesitter_node_mappings[lang]
+	if not lang_mappings then
+		return nil
+	end
+
+	-- Parse and get tree
+	local tree = parser:parse()[1]
+	if not tree then
+		return nil
+	end
+
+	-- Find node at cursor position (convert to 0-indexed)
+	local row = line_num - 1
+	local node = tree:root():named_descendant_for_range(row, 0, row, 0)
+
+	-- Walk up the tree to find a recognized node type
+	while node do
+		local node_type = node:type()
+		local mapping = lang_mappings[node_type]
+
+		if mapping then
+			local identifier = extract_identifier_from_node(node, mapping)
+			if identifier then
+				return identifier, mapping.type
+			end
+		end
+
+		node = node:parent()
+	end
+
+	return nil
+end
+
+---Extract context information from a line of code (fallback to regex)
 ---@param line string Code line to analyze
 ---@param file_ext string File extension
 ---@return string|nil identifier Extracted identifier
@@ -240,6 +410,19 @@ end
 ---@return table|nil context Context information with identifier, type, and distance
 local function get_surrounding_context(line_num, max_lines)
 	max_lines = max_lines or 3
+
+	-- First try treesitter for accurate results
+	local identifier, type = get_context_from_treesitter(line_num)
+	if identifier then
+		return {
+			identifier = identifier,
+			type = type,
+			distance = 0,
+			source = "treesitter",
+		}
+	end
+
+	-- Fallback to regex-based approach
 	local contexts = {}
 	local file_ext = get_file_extension(vim.fn.expand("%"))
 
@@ -248,21 +431,37 @@ local function get_surrounding_context(line_num, max_lines)
 		if offset ~= 0 then
 			local context_line_num = line_num + offset
 			if context_line_num > 0 and context_line_num <= vim.fn.line("$") then
-				local context_line = vim.fn.getline(context_line_num)
-				local identifier, type = get_context_from_line(context_line, file_ext)
+				-- Try treesitter first
+				identifier, type = get_context_from_treesitter(context_line_num)
 				if identifier then
 					table.insert(contexts, {
 						identifier = identifier,
 						type = type,
 						distance = math.abs(offset),
+						source = "treesitter",
 					})
+				else
+					-- Fallback to regex
+					local context_line = vim.fn.getline(context_line_num)
+					identifier, type = get_context_from_line(context_line, file_ext)
+					if identifier then
+						table.insert(contexts, {
+							identifier = identifier,
+							type = type,
+							distance = math.abs(offset),
+							source = "regex",
+						})
+					end
 				end
 			end
 		end
 	end
 
-	-- Sort by distance (closest first)
+	-- Sort by distance (closest first) and prefer treesitter results
 	table.sort(contexts, function(a, b)
+		if a.distance == b.distance then
+			return a.source == "treesitter" and b.source ~= "treesitter"
+		end
 		return a.distance < b.distance
 	end)
 
@@ -365,10 +564,15 @@ end
 function M.generate_mark_name(bufname, line)
 	local filename = vim.fn.fnamemodify(bufname, ":t:r")
 	local file_ext = get_file_extension(bufname)
-	local current_line = vim.fn.getline(".")
 
-	-- Try to get context from current line
-	local identifier, type = get_context_from_line(current_line, file_ext)
+	-- First try treesitter for current line
+	local identifier, type = get_context_from_treesitter(line)
+
+	-- If treesitter didn't work, try regex on current line
+	if not identifier then
+		local current_line = vim.fn.getline(".")
+		identifier, type = get_context_from_line(current_line, file_ext)
+	end
 
 	-- If no context on current line, look at surrounding lines
 	if not identifier then
@@ -398,6 +602,10 @@ function M.generate_mark_name(bufname, line)
 			prefix = "trait:"
 		elseif type == "const" or type == "variable" then
 			prefix = "var:"
+		elseif type == "arrow_function" then
+			prefix = "arrow:"
+		elseif type == "type" then
+			prefix = "type:"
 		end
 		return prefix .. identifier
 	end
@@ -622,6 +830,16 @@ function M.get_marks_statistics(marks)
 			mark_type = "method"
 		elseif name:match("^var:") then
 			mark_type = "variable"
+		elseif name:match("^arrow:") then
+			mark_type = "arrow_function"
+		elseif name:match("^type:") then
+			mark_type = "type"
+		elseif name:match("^interface:") then
+			mark_type = "interface"
+		elseif name:match("^trait:") then
+			mark_type = "trait"
+		elseif name:match("^enum:") then
+			mark_type = "enum"
 		end
 
 		stats.types[mark_type] = (stats.types[mark_type] or 0) + 1
