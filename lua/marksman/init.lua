@@ -67,7 +67,7 @@ local function notify(message, level)
 end
 
 ---Validate configuration against schema
----@param user_config table User provided configuration
+---@param user_config table? User provided configuration
 ---@param schema table Validation schema
 ---@return table validated_config Validated configuration
 local function validate_config(user_config, schema)
@@ -103,7 +103,7 @@ local function validate_config(user_config, schema)
 end
 
 ---Lazy module loading with error handling
----@return table storage Storage module
+---@return table? storage Storage module
 local function get_storage()
 	if not storage then
 		local ok, module = pcall(require, "marksman.storage")
@@ -118,7 +118,7 @@ local function get_storage()
 end
 
 ---Lazy module loading with error handling
----@return table ui UI module
+---@return table? ui UI module
 local function get_ui()
 	if not ui then
 		local ok, module = pcall(require, "marksman.ui")
@@ -133,7 +133,7 @@ local function get_ui()
 end
 
 ---Lazy module loading with error handling
----@return table utils Utils module
+---@return table? utils Utils module
 local function get_utils()
 	if not utils then
 		local ok, module = pcall(require, "marksman.utils")
@@ -162,8 +162,8 @@ local function debounced_save()
 end
 
 ---Add a mark at the current cursor position
----@param name string|nil Optional mark name (auto-generated if nil)
----@param description string|nil Optional mark description
+---@param name string? Optional mark name (auto-generated if nil)
+---@param description string? Optional mark description
 ---@return table result Result with success, message, and mark_name
 function M.add_mark(name, description)
 	local storage_module = get_storage()
@@ -365,7 +365,7 @@ function M.move_mark(name, direction)
 end
 
 ---Show marks in floating window
----@param search_query string|nil Optional search query to filter marks
+---@param search_query string? Optional search query to filter marks
 function M.show_marks(search_query)
 	local storage_module = get_storage()
 	local ui_module = get_ui()
@@ -518,7 +518,7 @@ function M.cleanup()
 end
 
 ---Setup function to initialize the plugin
----@param opts table|nil User configuration options
+---@param opts table? User configuration options
 function M.setup(opts)
 	-- Validate and merge configuration
 	local validated_opts = validate_config(opts, config_schema)

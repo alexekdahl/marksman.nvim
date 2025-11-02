@@ -1,13 +1,5 @@
+-- luacheck: globals describe it before_each after_each assert
 local assert = require("luassert")
-
--- Helper to create test files
-local function create_test_file(name, content)
-	local test_dir = vim.env.MARKSMAN_TEST_DIR or vim.fn.tempname()
-	local filepath = test_dir .. "/" .. name
-	vim.fn.mkdir(vim.fn.fnamemodify(filepath, ":h"), "p")
-	vim.fn.writefile(content or { "test content" }, filepath)
-	return filepath
-end
 
 -- Helper to setup buffer with file
 local function setup_buffer_with_file(filepath, content)
