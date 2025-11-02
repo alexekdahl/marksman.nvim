@@ -25,7 +25,7 @@ local naming_patterns = {
 		language = { "lua" },
 		type = "method",
 	},
-	
+
 	-- JavaScript/TypeScript patterns
 	{
 		pattern = "function%s+([%w_]+)",
@@ -57,7 +57,7 @@ local naming_patterns = {
 		language = { "js", "ts", "jsx", "tsx" },
 		type = "method",
 	},
-	
+
 	-- Python patterns
 	{
 		pattern = "def%s+([%w_]+)",
@@ -74,7 +74,7 @@ local naming_patterns = {
 		language = { "py" },
 		type = "async_function",
 	},
-	
+
 	-- Go patterns
 	{
 		pattern = "func%s+([%w_]+)",
@@ -96,7 +96,7 @@ local naming_patterns = {
 		language = { "go" },
 		type = "interface",
 	},
-	
+
 	-- Rust patterns
 	{
 		pattern = "fn%s+([%w_]+)",
@@ -123,7 +123,7 @@ local naming_patterns = {
 		language = { "rs" },
 		type = "impl",
 	},
-	
+
 	-- C/C++ patterns
 	{
 		pattern = "class%s+([%w_]+)",
@@ -145,7 +145,7 @@ local naming_patterns = {
 		language = { "c", "h" },
 		type = "typedef",
 	},
-	
+
 	-- Java patterns
 	{
 		pattern = "class%s+([%w_]+)",
@@ -167,7 +167,7 @@ local naming_patterns = {
 		language = { "java" },
 		type = "class",
 	},
-	
+
 	-- Generic patterns
 	{
 		pattern = "#define%s+([%w_]+)",
@@ -294,7 +294,7 @@ function M.validate_mark_name(name)
 
 	-- Check for invalid characters
 	if name:match('[<>:"/\\|?*]') then
-		return false, "Mark name contains invalid characters: < > : \" / \\ | ? *"
+		return false, 'Mark name contains invalid characters: < > : " / \\ | ? *'
 	end
 
 	-- Check for reserved names
@@ -427,7 +427,7 @@ function M.filter_marks(marks, query)
 			mark.text or "", -- line content
 			mark.description or "", -- description if available
 		}
-		
+
 		local searchable_text = table.concat(searchable_parts, " "):lower()
 
 		-- Check if all search terms match
@@ -664,7 +664,7 @@ function M.is_mark_stale(mark)
 			local similarity = 0
 			local words1 = vim.split(mark.text:lower(), "%s+")
 			local words2 = vim.split(current_text:lower(), "%s+")
-			
+
 			local common_words = 0
 			for _, word1 in ipairs(words1) do
 				for _, word2 in ipairs(words2) do
@@ -674,11 +674,11 @@ function M.is_mark_stale(mark)
 					end
 				end
 			end
-			
+
 			if #words1 > 0 then
 				similarity = common_words / #words1
 			end
-			
+
 			if similarity < 0.5 then
 				return true, "Line content has changed significantly"
 			end

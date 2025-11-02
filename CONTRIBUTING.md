@@ -14,7 +14,27 @@ Thank you for your interest in contributing to Marksman.nvim! This document prov
 ### Prerequisites
 - Neovim >= 0.8.0
 - Git
-- Lua 5.1+ (for testing outside Neovim)
+- [just](https://github.com/casey/just) command runner (or make)
+- [plenary.nvim](https://github.com/nvim-lua/plenary.nvim) for testing
+
+### Quick Start
+```bash
+# Install dependencies
+just install-deps
+
+# Run tests
+just test
+
+# Run specific test
+just test-file tests/marksman_spec.lua
+
+# Watch tests (requires entr)
+just test-watch
+
+# Lint and format
+just lint
+just format
+```
 
 ### Code Quality Tools
 ```bash
@@ -25,10 +45,10 @@ luarocks install luacheck
 cargo install stylua
 
 # Run linting
-luacheck lua/
+just lint
 
 # Run formatting
-stylua lua/
+just format
 ```
 
 ## Code Style
@@ -64,6 +84,10 @@ lua/marksman/
 ├── storage.lua   -- Mark persistence and project management
 ├── ui.lua        -- Floating window and interface
 └── utils.lua     -- Utilities and validation
+
+tests/
+├── minimal_init.lua    -- Test environment setup
+└── marksman_spec.lua   -- Main test suite
 ```
 
 ## Contribution Types
@@ -77,7 +101,7 @@ lua/marksman/
 ### New Features
 1. **Discuss the feature** in an issue first
 2. **Ensure it aligns** with the plugin's focused scope
-3. **Write comprehensive documentation**
+3. **Write comprehensive tests**
 4. **Add configuration options** if needed
 
 ### Documentation
@@ -87,11 +111,35 @@ lua/marksman/
 
 ## Testing Guidelines
 
-### Manual Testing
-- Test with **multiple projects**
-- Verify **mark persistence** across sessions
-- Test **edge cases** (empty files, special characters)
-- Check **memory usage** with large mark sets
+### Test Framework
+We use [plenary.nvim](https://github.com/nvim-lua/plenary.nvim) for testing with a describe/it structure:
+
+```lua
+describe("feature", function()
+    before_each(function()
+        -- Setup code
+    end)
+    
+    it("does something", function()
+        assert.is_true(some_condition)
+    end)
+end)
+```
+
+### Running Tests
+```bash
+# Run all tests
+just test
+
+# Run specific test file
+just test-file tests/marksman_spec.lua
+
+# Watch tests (auto-run on file changes)
+just test-watch
+
+# Clean test artifacts
+just clean
+```
 
 ### Test Scenarios
 1. **Basic Operations**:
@@ -112,6 +160,12 @@ lua/marksman/
    - Window sizing and positioning
    - Keyboard navigation
    - Search and filtering
+
+### Writing Tests
+- Use descriptive test names
+- Test both success and failure cases
+- Clean up resources in `after_each`
+- Mock external dependencies when needed
 
 ## Performance Considerations
 
@@ -190,9 +244,10 @@ require("marksman").setup({
 
 ### Before Submitting
 1. **Test thoroughly** on your system
-2. **Run linting** and fix issues
-3. **Update documentation** if needed
-4. **Rebase on main** branch
+2. **Run linting** and fix issues: `just lint`
+3. **Format code**: `just format`
+4. **Update documentation** if needed
+5. **Rebase on main** branch
 
 ### PR Description Template
 ```markdown

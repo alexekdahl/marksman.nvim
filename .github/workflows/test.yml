@@ -8,6 +8,9 @@ on:
 
 jobs:
   test:
+    strategy:
+      matrix:
+        neovim-version: ['stable', 'nightly']
     runs-on: ubuntu-latest
     
     steps:
@@ -17,7 +20,14 @@ jobs:
         uses: rhysd/action-setup-vim@v1
         with:
           neovim: true
-          version: stable
+          version: ${{ matrix.neovim-version }}
+      
+      - name: Install plenary.nvim
+        run: |
+          mkdir -p ~/.local/share/nvim/lazy/plenary.nvim
+          git clone --depth=1 https://github.com/nvim-lua/plenary.nvim.git ~/.local/share/nvim/lazy/plenary.nvim
       
       - name: Run tests
-        run: nvim --headless -c "luafile tests/integration_test.lua" -c "qa!"
+        run: |
+          nvim --headless --noplugin -u tests/minimal_init.lua \
+            -c "lua require('plenary.test_harness').test_directory('tests', {minimal_init = 'tests/minimal_init.lua'})"
