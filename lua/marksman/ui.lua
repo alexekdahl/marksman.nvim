@@ -97,7 +97,7 @@ end
 ---Create header content for marks window
 ---@param total_marks number Total number of marks
 ---@param shown_marks number Number of marks shown
----@param search_query string|nil Search query if any
+---@param search_query string? Search query if any
 ---@return table lines Array of header lines
 ---@return table highlights Array of highlight definitions
 local function create_header_content(total_marks, shown_marks, search_query)
@@ -137,6 +137,7 @@ end
 ---@param name string Mark name
 ---@param mark table Mark data
 ---@param index number Mark index
+---@param line_idx number Line index for highlights
 ---@return string line Formatted line
 ---@return table highlights Array of highlight definitions for this line
 local function create_minimal_mark_line(name, mark, index, line_idx)
@@ -239,7 +240,7 @@ end
 
 ---Create complete marks window content
 ---@param marks table All marks data
----@param search_query string|nil Optional search query
+---@param search_query string? Optional search query
 ---@return table lines Array of content lines
 ---@return table highlights Array of highlight definitions
 ---@return table mark_info Mapping of line numbers to mark info
@@ -331,7 +332,7 @@ end
 
 ---Find mark information for current cursor position
 ---@param mark_info table Mapping of line numbers to mark info
----@return table|nil mark_info Mark info for cursor position
+---@return table? mark_info Mark info for cursor position
 local function get_mark_under_cursor(mark_info)
 	local line = vim.fn.line(".")
 	local closest_mark = nil
@@ -353,7 +354,7 @@ end
 ---@param marks table Marks data
 ---@param project_name string Project name
 ---@param mark_info table Mark info mapping
----@param search_query string|nil Search query
+---@param search_query string? Search query
 local function setup_window_keymaps(buf, marks, project_name, mark_info, search_query)
 	local function refresh_window(new_search)
 		local storage = require("marksman.storage")
@@ -511,7 +512,7 @@ end
 -- Public API
 
 ---Setup the UI module
----@param user_config table Plugin configuration
+---@param user_config table? Plugin configuration
 function M.setup(user_config)
 	config = user_config or {}
 	setup_highlights()
@@ -520,7 +521,7 @@ end
 ---Show marks in floating window
 ---@param marks table Marks data
 ---@param project_name string Project name
----@param search_query string|nil Optional search query
+---@param search_query string? Optional search query
 function M.show_marks_window(marks, project_name, search_query)
 	-- Close existing window
 	close_window()
@@ -540,9 +541,11 @@ function M.show_marks_window(marks, project_name, search_query)
 
 	local ok, err = pcall(function()
 		vim.api.nvim_buf_set_lines(buf, 0, -1, false, lines)
-		vim.bo[buf].modifiable = false
-		vim.bo[buf].buftype = "nofile"
-		vim.bo[buf].filetype = "marksman"
+		-- Use vim.bo syntax instead of deprecated option setting
+		local bufnr = buf
+		vim.bo[bufnr].modifiable = false
+		vim.bo[bufnr].buftype = "nofile"
+		vim.bo[bufnr].filetype = "marksman"
 	end)
 
 	if not ok then
@@ -587,8 +590,10 @@ function M.show_marks_window(marks, project_name, search_query)
 	current_window = win
 	current_buffer = buf
 
-	-- Set window highlight
-	pcall(vim.api.nvim_win_set_option, win, "winhighlight", "Normal:Normal,FloatBorder:ProjectMarksBorder")
+	-- Set window highlight using vim.wo syntax
+	pcall(function()
+		vim.wo[win].winhighlight = "Normal:Normal,FloatBorder:ProjectMarksBorder"
+	end)
 
 	-- Setup keymaps
 	setup_window_keymaps(buf, marks, project_name, mark_info, search_query)
