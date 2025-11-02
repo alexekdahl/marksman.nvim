@@ -29,7 +29,7 @@ end
 ---@return string project_root The project root directory
 local function get_project_root()
 	local current_dir = vim.fn.expand("%:p:h")
-	
+
 	-- Check cache first (expires after 30 seconds)
 	local cache_key = current_dir
 	local now = os.time()
@@ -103,13 +103,13 @@ local function get_marks_file()
 	if not project then
 		error("Could not determine project root")
 	end
-	
+
 	local hash = vim.fn.sha256(project):sub(1, 8)
 	local data_path = vim.fn.stdpath("data")
 	if not data_path then
 		error("Could not get Neovim data directory")
 	end
-	
+
 	return data_path .. "/marksman_" .. hash .. ".json"
 end
 
@@ -174,26 +174,26 @@ local function validate_marks_data(data)
 		if type(name) ~= "string" or name == "" then
 			return false, "Mark names must be non-empty strings"
 		end
-		
+
 		if type(mark) ~= "table" then
 			return false, "Mark data must be a table"
 		end
-		
+
 		local required_fields = { "file", "line", "col" }
 		for _, field in ipairs(required_fields) do
 			if not mark[field] then
 				return false, "Missing required field: " .. field
 			end
 		end
-		
+
 		if type(mark.line) ~= "number" or mark.line < 1 then
 			return false, "Line must be a positive number"
 		end
-		
+
 		if type(mark.col) ~= "number" or mark.col < 1 then
 			return false, "Column must be a positive number"
 		end
-		
+
 		if type(mark.file) ~= "string" or mark.file == "" then
 			return false, "File must be a non-empty string"
 		end
@@ -298,7 +298,7 @@ function M.save_marks()
 			saved_at = os.date("%Y-%m-%d %H:%M:%S"),
 			project = current_project,
 		}
-		
+
 		local json = vim.json.encode(data)
 		if not json then
 			error("Failed to encode marks data")
@@ -608,7 +608,7 @@ function M.import_marks()
 							for name, mark in pairs(data.marks) do
 								marks_data[name] = mark
 							end
-							
+
 							-- Merge order arrays, avoiding duplicates
 							if data.mark_order then
 								for _, name in ipairs(data.mark_order) do
@@ -665,7 +665,7 @@ function M.cleanup()
 	-- Clear caches
 	project_root_cache = {}
 	cache_expiry = {}
-	
+
 	-- Reset state
 	marks = {}
 	mark_order = {}
