@@ -11,39 +11,39 @@ local current_buffer = nil
 
 -- File icon mapping for better visual display
 local file_icons = {
-	lua = "",
-	py = "",
-	js = "",
-	ts = "",
-	jsx = "",
-	tsx = "",
-	vue = "﵂",
-	go = "",
-	rs = "",
-	c = "",
-	cpp = "",
-	h = "",
-	hpp = "",
-	java = "",
+	lua = "󰢱",
+	py = "󰌠",
+	js = "󰌞",
+	ts = "󰛦",
+	jsx = "󰜈",
+	tsx = "󰛦",
+	vue = "󰡄",
+	go = "󰟓",
+	rs = "󱘗",
+	c = "",
+	cpp = "󰙱",
+	h = "󰟔",
+	hpp = "󰙲",
+	java = "󰬷",
 	kt = "󱈙",
 	cs = "󰌛",
-	rb = "",
-	php = "",
-	html = "",
-	css = "",
-	scss = "",
-	json = "",
-	yaml = "",
-	yml = "",
-	toml = "",
+	rb = "󰴭",
+	php = "󰌟",
+	html = "󰌝",
+	css = "󰌜",
+	scss = "󰛓",
+	json = "󰘓",
+	yaml = "󰈙",
+	yml = "󰈙",
+	toml = "󰈙",
 	xml = "󰗀",
-	md = "",
-	txt = "",
-	vim = "",
-	sh = "",
+	md = "󰍔",
+	txt = "󰈙",
+	vim = "",
+	sh = "󰘳",
 	fish = "󰈺",
-	zsh = "",
-	bash = "",
+	zsh = "󰰶",
+	bash = "󰘳",
 }
 
 ---Helper function for conditional notifications
@@ -84,7 +84,7 @@ end
 ---@return string relative_path Formatted relative path
 local function get_relative_path_display(filepath)
 	local rel_path = vim.fn.fnamemodify(filepath, ":~:.")
-	
+
 	-- If path is too long, show parent directory + filename
 	if #rel_path > 50 then
 		local parent = vim.fn.fnamemodify(filepath, ":h:t")
@@ -105,8 +105,9 @@ local function create_header_content(total_marks, shown_marks, search_query)
 	local highlights = {}
 
 	-- Title
-	local title = search_query and search_query ~= ""
-		and string.format(" 󰃀 Project Marks (filtered: %s) ", search_query)
+	local title = search_query
+			and search_query ~= ""
+			and string.format(" 󰃀 Project Marks (filtered: %s) ", search_query)
 		or " 󰃀 Project Marks "
 	table.insert(lines, title)
 	table.insert(highlights, { line = 0, col = 0, end_col = -1, hl_group = "ProjectMarksTitle" })
@@ -141,7 +142,7 @@ end
 local function create_minimal_mark_line(name, mark, index, line_idx)
 	local filepath = get_relative_path_display(mark.file)
 	local line = string.format("[%d] %s %s", index, name, filepath)
-	
+
 	local highlights = {}
 	local number_part = string.format("[%d]", index)
 	local name_start = #number_part + 1
@@ -154,7 +155,7 @@ local function create_minimal_mark_line(name, mark, index, line_idx)
 		end_col = #number_part,
 		hl_group = "ProjectMarksNumber",
 	})
-	
+
 	-- Name highlight
 	table.insert(highlights, {
 		line = line_idx,
@@ -162,7 +163,7 @@ local function create_minimal_mark_line(name, mark, index, line_idx)
 		end_col = name_end,
 		hl_group = "ProjectMarksName",
 	})
-	
+
 	-- File path highlight
 	table.insert(highlights, {
 		line = line_idx,
@@ -279,10 +280,10 @@ local function create_marks_content(marks, search_query)
 			local mark = marks[name]
 			local line_idx = #lines
 			local line, line_highlights = create_minimal_mark_line(name, mark, i, line_idx)
-			
+
 			table.insert(lines, line)
 			mark_info[line_idx] = { name = name, mark = mark, index = i }
-			
+
 			for _, hl in ipairs(line_highlights) do
 				table.insert(highlights, hl)
 			end
@@ -302,8 +303,7 @@ local function create_marks_content(marks, search_query)
 
 	-- Handle no marks case
 	if shown_marks == 0 then
-		local no_marks_line = search_query and search_query ~= ""
-			and " No marks found matching search"
+		local no_marks_line = search_query and search_query ~= "" and " No marks found matching search"
 			or " No marks in this project"
 		table.insert(lines, no_marks_line)
 		table.insert(highlights, { line = #lines - 1, col = 0, end_col = -1, hl_group = "ProjectMarksText" })
@@ -315,9 +315,9 @@ local function create_marks_content(marks, search_query)
 		local mark = marks[name]
 		local start_line_idx = #lines
 		local mark_lines, mark_highlights = create_detailed_mark_lines(name, mark, i, start_line_idx)
-		
+
 		mark_info[start_line_idx] = { name = name, mark = mark, index = i }
-		
+
 		for _, line in ipairs(mark_lines) do
 			table.insert(lines, line)
 		end
@@ -459,8 +459,12 @@ local function setup_window_keymaps(buf, marks, project_name, mark_info, search_
 	vim.keymap.set("n", "C", clear_all_marks, keymap_opts)
 
 	-- Reordering
-	vim.keymap.set("n", "J", function() move_selected("down") end, keymap_opts)
-	vim.keymap.set("n", "K", function() move_selected("up") end, keymap_opts)
+	vim.keymap.set("n", "J", function()
+		move_selected("down")
+	end, keymap_opts)
+	vim.keymap.set("n", "K", function()
+		move_selected("up")
+	end, keymap_opts)
 
 	-- Number key navigation
 	for i = 1, 9 do
@@ -486,16 +490,16 @@ end
 local function calculate_window_dimensions(content_lines)
 	local max_width = 120
 	local max_height = vim.o.lines - 6
-	
+
 	-- Calculate content width
 	local content_width = 0
 	for _, line in ipairs(content_lines) do
 		content_width = math.max(content_width, vim.fn.strdisplaywidth(line))
 	end
-	
+
 	local width = math.min(math.max(content_width + 4, 60), max_width)
 	local height = math.min(#content_lines + 2, max_height)
-	
+
 	return {
 		width = width,
 		height = height,
