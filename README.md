@@ -22,6 +22,9 @@ Vim's built-in marks are great, but they're global and get messy fast. Marksman 
 - **Interactive UI** - Browse and manage marks in an enhanced floating window
 - **Reordering** - Move marks up and down to organize them as needed
 - **Multiple integrations** - Works with Telescope, Snacks.nvim, and more
+- **Robust error handling** - Graceful fallbacks and comprehensive validation
+- **Memory efficient** - Lazy loading and cleanup for optimal performance
+- **Debounced operations** - Reduced I/O with intelligent batching
 
 ## Requirements
 
@@ -58,6 +61,7 @@ Vim's built-in marks are great, but they're global and get messy fast. Marksman 
     silent = false,
     minimal = false,
     disable_default_keymaps = false,
+    debounce_ms = 500,
   },
 }
 ```
@@ -94,6 +98,16 @@ require("marksman").setup({
     goto_3 = "<leader>m3",
     goto_4 = "<leader>m4",
   },
+})
+```
+
+### Performance Tuning
+
+```lua
+require("marksman").setup({
+  max_marks = 50,        -- Lower limit for better performance
+  debounce_ms = 1000,    -- Longer debounce for fewer saves
+  auto_save = true,      -- Keep auto-save enabled
 })
 ```
 
@@ -150,6 +164,14 @@ Search through all mark data:
 require("marksman").search_marks("api controller")
 ```
 
+#### Mark Statistics
+Get detailed statistics about your marks:
+```lua
+local stats = require("marksman").get_memory_usage()
+print("Total marks: " .. stats.marks_count)
+print("File size: " .. stats.file_size .. " bytes")
+```
+
 ## Commands
 
 ```
@@ -162,6 +184,7 @@ require("marksman").search_marks("api controller")
 :MarkSearch [query]          - Search marks
 :MarkExport                  - Export marks to JSON
 :MarkImport                  - Import marks from JSON
+:MarkStats                   - Show mark statistics
 ```
 
 ## Enhanced UI Features
@@ -173,6 +196,8 @@ The floating window includes:
 - **File path display** - View relative file paths for better context
 - **Mark reordering** - Press `J`/`K` to move marks up/down
 - **Clear all marks** - Press `C` to clear all marks with confirmation
+- **Dynamic sizing** - Window adapts to content size
+- **Error feedback** - Clear messages for failed operations
 
 ## Telescope Integration
 
@@ -277,22 +302,34 @@ end
 ```lua
 local marksman = require("marksman")
 
--- Basic operations
-marksman.add_mark("my_mark")
-marksman.goto_mark("my_mark")
-marksman.goto_mark(1)  -- Jump to first mark by index
-marksman.delete_mark("my_mark")
-marksman.rename_mark("old_name", "new_name")
+-- Basic operations (now return result tables)
+local result = marksman.add_mark("my_mark")
+if result.success then
+  print("Mark added: " .. result.mark_name)
+else
+  print("Error: " .. result.message)
+end
+
+local result = marksman.goto_mark("my_mark")
+local result = marksman.goto_mark(1)  -- Jump to first mark by index
+local result = marksman.delete_mark("my_mark")
+local result = marksman.rename_mark("old_name", "new_name")
 
 -- Enhanced features
-marksman.search_marks("search query")
-marksman.show_marks()
+local filtered = marksman.search_marks("search query")
+marksman.show_marks("optional_search_query")
 
 -- Utility functions
-marksman.get_marks()
-marksman.get_marks_count()
-marksman.export_marks()
-marksman.import_marks()
+local marks = marksman.get_marks()
+local count = marksman.get_marks_count()
+local stats = marksman.get_memory_usage()
+
+-- Import/Export
+local result = marksman.export_marks()
+local result = marksman.import_marks()
+
+-- Cleanup
+marksman.cleanup()  -- Free memory and resources
 ```
 
 ### Storage Operations
@@ -301,6 +338,30 @@ marksman.import_marks()
 local storage = require("marksman.storage")
 
 storage.get_project_name()    -- Get current project name
+storage.save_marks()          -- Manual save
+storage.cleanup()             -- Cleanup resources
+```
+
+### Utils Functions
+
+```lua
+local utils = require("marksman.utils")
+
+-- Validation
+local valid, err = utils.validate_mark_name("my_mark")
+local valid, err = utils.validate_mark_data(mark_data)
+
+-- Smart naming
+local name = utils.suggest_mark_name(bufname, line, existing_marks)
+local sanitized = utils.sanitize_mark_name("raw name")
+
+-- Statistics
+local stats = utils.get_marks_statistics(marks)
+local is_stale, reason = utils.is_mark_stale(mark)
+
+-- File handling
+local rel_path = utils.get_relative_path(filepath)
+local formatted = utils.format_file_path(filepath, max_length)
 ```
 
 ## Configuration Options
@@ -309,49 +370,99 @@ storage.get_project_name()    -- Get current project name
 |--------|------|---------|-------------|
 | `keymaps` | table | `{...}` | Key mappings for mark operations |
 | `auto_save` | boolean | `true` | Automatically save marks |
-| `max_marks` | number | `100` | Maximum marks per project |
+| `max_marks` | number | `100` | Maximum marks per project (1-1000) |
 | `search_in_ui` | boolean | `true` | Enable search in UI |
-| `minimal` | boolean | `false` | Set to true for clean UI (number, name, and filepath only)|
-| `silent` | boolean | `false` | Set to true to supress notifications|
-| `disable_default_keymaps` | boolean | `false` | Set to true to disable all default keymaps |
+| `minimal` | boolean | `false` | Clean UI (number, name, and filepath only)|
+| `silent` | boolean | `false` | Suppress notifications|
+| `disable_default_keymaps` | boolean | `false` | Disable all default keymaps |
+| `debounce_ms` | number | `500` | Debounce delay for save operations (100-5000ms) |
 | `highlights` | table | `{...}` | Custom highlight groups |
 
 ## How it works
 
 ### Storage
-Marks are stored in `~/.local/share/nvim/marksman_[hash].json` where the hash is derived from your project path. Each project gets its own file with automatic backup support.
+Marks are stored in `~/.local/share/nvim/marksman_[hash].json` where the hash is derived from your project path. Each project gets its own file with automatic backup support and atomic writes for data safety.
 
 ### Smart Naming
-When you add a mark without a name, Marksman analyzes the code context to generate meaningful names:
+When you add a mark without a name, Marksman analyzes the code context to generate meaningful names with expanded language support:
 
-- **Functions**: `fn:calculate_total`
+- **Functions**: `fn:calculate_total`, `async_function:fetch_data`
 - **Classes**: `class:UserModel` 
 - **Structs**: `struct:Config`
+- **Methods**: `method:validate`
+- **Variables**: `var:api_key`
 - **Fallback**: `filename:line`
 
 ### Project Detection
-Marksman uses multiple methods to find your project root:
+Marksman uses multiple methods to find your project root with caching:
 
 1. Git repository root
 2. Common project files (.git, package.json, Cargo.toml, etc.)
 3. Current working directory as fallback
 
 ### Search Algorithm
-The search function looks through:
+The enhanced search function looks through:
 - Mark names
 - File names and paths
 - Code context (the line content)
+- Mark descriptions
+- Parent directory names
 
 ### File Path Display
 The UI shows relative file paths instead of just filenames, making it easier to distinguish between files with the same name in different directories.
 
+### Error Handling
+Comprehensive error handling with:
+- Graceful fallbacks for corrupted data
+- Automatic backup restoration
+- Input validation with clear error messages
+- Safe file operations with atomic writes
+
+### Memory Management
+- **Lazy loading**: Modules loaded only when needed
+- **Resource cleanup**: Automatic cleanup on exit
+- **Debounced operations**: Reduced I/O operations
+- **Cache management**: Smart caching with expiration
+
 ## Performance
 
 - **Lazy loading**: Modules are only loaded when needed
-- **Efficient storage**: JSON format with minimal file I/O
-- **Smart caching**: Marks are cached in memory after first load
-- **Fast search**: Optimized filtering algorithms
+- **Efficient storage**: JSON format with minimal file I/O and atomic writes
+- **Smart caching**: Project roots and marks cached in memory with expiration
+- **Fast search**: Optimized filtering algorithms with multi-field search
+- **Debounced saves**: Intelligent batching of save operations
+- **Memory monitoring**: Built-in memory usage tracking
+
+## Development
+
+### Contributing
+See [CONTRIBUTING.md](CONTRIBUTING.md) for detailed contribution guidelines.
+
+### Code Quality
+```bash
+# Lint code
+luacheck lua/
+
+# Format code  
+stylua lua/
+
+# Check for common issues
+grep -r "TODO\|FIXME\|XXX" lua/
+```
+
+### Performance Testing
+```lua
+-- Monitor memory usage
+local stats = require("marksman").get_memory_usage()
+print(vim.inspect(stats))
+
+-- Test with large datasets
+for i = 1, 1000 do
+  require("marksman").add_mark("test_" .. i)
+end
+```
 
 ## License
 
 MIT
+
