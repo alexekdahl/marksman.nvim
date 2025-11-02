@@ -1,15 +1,17 @@
 <p align="center">
-  <img src="assets/marksman.png" alt="marksman.nvim logo" width="100%"/>
+  <img src="assets/marksman1.png" alt="marksman.nvim logo" width="100%"/>
 </p>
-
-<h1 align="center">Marksman.nvim</h1>
 
 <p align="center">
   Advanced bookmarks for Neovim that actually stick around.
 </p>
 
-## Why?
+<div align="center">
+  <img src="assets/pic.png" alt="Screenshot 1" width="45%"/>
+  <img src="assets/pic2.png" alt="Screenshot 2" width="45%"/>
+</div>
 
+## Why?
 Vim's built-in marks are great, but they're global and get messy fast. Marksman keeps your bookmarks organized by project, adds powerful search capabilities, and provides a clean interface to manage them.
 
 ## Features
