@@ -523,8 +523,17 @@ local function setup_window_keymaps(buf, marks, project_name, mark_info, search_
 	end
 
 	local function clear_all_marks()
-		local marksman = require("marksman")
-		marksman.clear_all_marks()
+		vim.ui.select({ "Yes", "No" }, {
+			prompt = "Clear all marks in this project?",
+		}, function(choice)
+			if choice == "Yes" then
+				local marksman = require("marksman.storage")
+				marksman.clear_all_marks()
+				marksman.save_marks()
+				close_window()
+				notify("󰃀 All marks cleared", vim.log.levels.INFO)
+			end
+		end)
 	end
 
 	local keymap_opts = { buffer = buf, noremap = true, silent = true }
