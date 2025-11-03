@@ -155,6 +155,45 @@ describe("marksman.nvim", function()
 			result = marksman.delete_mark("nonexistent")
 			assert.is_false(result.success)
 		end)
+
+		-- Test case for the clear all marks bug fix
+		-- This ensures that clearing all marks through the UI properly persists the changes
+		it("clears all marks and persists changes", function()
+			vim.cmd("edit " .. test_file)
+
+			-- Add multiple marks at different positions
+			marksman.add_mark("mark1")
+			vim.fn.cursor(2, 1)
+			marksman.add_mark("mark2")
+			vim.fn.cursor(3, 1)
+			marksman.add_mark("mark3")
+
+			-- Verify marks were added
+			assert.equals(3, marksman.get_marks_count())
+
+			-- Mock vim.ui.select to automatically confirm the clear action
+			local original_select = vim.ui.select
+			vim.ui.select = function(choices, opts, callback)
+				if opts.prompt == "Clear all marks in this project?" then
+					callback("Yes") -- Simulate user selecting "Yes"
+				end
+			end
+
+			-- Clear all marks (this should trigger the save mechanism)
+			marksman.clear_all_marks()
+
+			-- Restore original function
+			vim.ui.select = original_select
+
+			-- Verify marks were cleared immediately
+			assert.equals(0, marksman.get_marks_count())
+
+			-- Wait for any debounced save operations to complete
+			vim.wait(200)
+
+			-- Verify marks remain cleared after save delay
+			assert.equals(0, marksman.get_marks_count(), "Marks should remain cleared after debounced save")
+		end)
 	end)
 
 	describe("mark search and filtering", function()
