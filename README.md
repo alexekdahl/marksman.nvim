@@ -18,7 +18,7 @@ Vim's built-in marks are great, but they're global and get messy fast. Marksman 
 
 - **Project-scoped marks** - Each project gets its own isolated set of bookmarks
 - **Persistent storage** - Your marks survive Neovim restarts with automatic backup
-- **Smart naming** - Context-aware auto-generation based on code structure
+- **Smart naming** - Context-aware auto-generation using Treesitter and pattern matching
 - **Quick access** - Jump to marks with single keys or interactive UI
 - **Enhanced search** - Find marks by name, file path, or content with real-time filtering
 - **Mark reordering** - Move marks up/down to organize them as needed
