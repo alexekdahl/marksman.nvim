@@ -20,7 +20,7 @@ Vim's built-in marks are great, but they're global and get messy fast. Marksman 
 - **Persistent storage** - Your marks survive Neovim restarts with automatic backup
 - **Smart naming** - Context-aware auto-generation using Treesitter and pattern matching
 - **Quick access** - Jump to marks with single keys or interactive UI
-- **Sequential navigation** — Jump to the closest mark relative to your cursor, fallback to jump from mark 1 when no marks are in the current file
+- **Sequential navigation** — Jumps relative to the nearest mark in the current file. If the current file has no marks, next jumps to the first mark and previous jumps to the last.
 - **Enhanced search** - Find marks by name, file path, or content with real-time filtering
 - **Mark reordering** - Move marks up/down to organize them as needed
 - **Multiple integrations** - Works with Telescope, Snacks.nvim, and more

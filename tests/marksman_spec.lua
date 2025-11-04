@@ -207,7 +207,7 @@ describe("marksman.nvim", function()
 			assert.equals(1, vim.fn.line("."), "Should move to b1")
 		end)
 
-		it("jumps to second mark when current file has no marks", function()
+		it("jumps to first mark when current file has no marks", function()
 			-- file A with marks
 			vim.cmd("edit " .. test_file)
 			vim.fn.cursor(1, 1)
@@ -221,10 +221,8 @@ describe("marksman.nvim", function()
 
 			local result = marksman.goto_next()
 			assert.is_true(result.success)
-
-			-- Should jump to second mark because fallback picks first index
 			assert.equals(test_file, vim.fn.expand("%:p"))
-			assert.equals(2, vim.fn.line("."), "Should move to m2")
+			assert.equals(1, vim.fn.line("."), "Should move to m1")
 		end)
 
 		it("jumps to first mark when only 1 mark exists", function()
@@ -277,6 +275,24 @@ describe("marksman.nvim", function()
 			result = marksman.goto_previous()
 			assert.is_true(result.success)
 			assert.equals(1, vim.fn.line("."), "Should jump from m2 to m1")
+		end)
+
+		it("jumps to last mark when current file has no marks", function()
+			-- file A with marks
+			vim.cmd("edit " .. test_file)
+			vim.fn.cursor(1, 1)
+			marksman.add_mark("m1")
+			vim.fn.cursor(2, 1)
+			marksman.add_mark("m2")
+
+			-- file B with zero marks
+			vim.cmd("edit " .. test_file2)
+			vim.fn.cursor(1, 1)
+
+			local result = marksman.goto_previous()
+			assert.is_true(result.success)
+			assert.equals(test_file, vim.fn.expand("%:p"))
+			assert.equals(2, vim.fn.line("."), "Should move to m2")
 		end)
 
 		it("deletes marks", function()
