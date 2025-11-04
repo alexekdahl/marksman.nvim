@@ -289,6 +289,87 @@ function M.goto_mark(name_or_index)
 	end
 end
 
+-- Finds the mark index closest to the current cursor position, using 1 as fallback.
+-- Returns:
+--   index (number | nil): the resolved mark index, or nil if no marks exist
+--   total (number | nil): total number of marks when successful, nil on failure
+--   error (string | nil): error message when no marks are available
+local function get_current_mark_index(storage_module)
+	local mark_names = storage_module.get_mark_names()
+	local count = #mark_names
+
+	if count == 0 then
+		return nil, nil, "No marks available"
+	end
+
+	local marks = storage_module.get_marks()
+	local current_file = vim.fn.expand("%:p")
+	local current_line = vim.fn.line(".")
+
+	local best_index = nil
+	local best_distance = nil
+
+	for index, mark_name in ipairs(mark_names) do
+		local mark = marks[mark_name]
+		if mark.file == current_file then
+			if mark.line == current_line then
+				return index, count, nil
+			end
+			local distance = math.abs(mark.line - current_line)
+			if not best_distance or distance < best_distance then
+				best_index = index
+				best_distance = distance
+			end
+		end
+	end
+
+	return best_index or 1, count, nil
+end
+
+---Jump to the next mark.
+---Navigation is context-aware:
+---• If the cursor is on a mark, jump relative to it.
+---• If the cursor is not on a mark, select the nearest mark in the same file before jumping.
+---• If the current file has no marks, fall back to first index before jumping.
+---Wraps when reaching the last mark.
+---@return table result Result with success and optional message
+function M.goto_next()
+	local storage_module = get_storage()
+	if not storage_module then
+		return { success = false, message = "Failed to load storage module" }
+	end
+
+	local current_index, count, err = get_current_mark_index(storage_module)
+	if not current_index then
+		return { success = false, message = err }
+	end
+
+	local next_index = (current_index % count) + 1
+	return M.goto_mark(next_index)
+end
+
+---Jump to the previous mark.
+---Navigation is context-aware:
+---• If the cursor is on a mark, jump relative to it.
+---• If the cursor is not on a mark, select the nearest mark in the same file before jumping.
+---• If the current file has no marks, fall back to first index before jumping.
+---Wraps when reaching the last mark.
+---@return table result Result with success and optional message
+function M.goto_previous()
+	local storage_module = get_storage()
+	if not storage_module then
+		return { success = false, message = "Failed to load storage module" }
+	end
+
+	local current_index, count, err = get_current_mark_index(storage_module)
+	if not current_index then
+		return { success = false, message = err }
+	end
+
+	local previous_index = ((current_index - 2) % count) + 1
+	return M.goto_mark(previous_index)
+end
+
 ---Delete a mark by name
 ---@param name string Mark name to delete
 ---@return table result Result with success and message
