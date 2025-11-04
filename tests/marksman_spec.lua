@@ -55,16 +55,26 @@ describe("marksman.nvim", function()
 	describe("mark operations", function()
 		local marksman = require("marksman")
 		local test_file
+		local test_file2
 
 		before_each(function()
 			clear_marks()
 			local test_dir = vim.env.MARKSMAN_TEST_DIR or vim.fn.tempname()
 			test_file = test_dir .. "/test.lua"
-			vim.fn.mkdir(vim.fn.fnamemodify(test_file, ":h"), "p")
+			test_file2 = test_dir .. "/test2.lua"
 
 			setup_buffer_with_file(test_file, {
 				"local function test()",
-				"  return true",
+				"  local value = false",
+				"  if value then",
+				"    return true",
+				"  end",
+				"  return false",
+			})
+
+			setup_buffer_with_file(test_file2, {
+				"local function test2()",
+				"  return false",
 				"end",
 			})
 		end)
@@ -123,6 +133,166 @@ describe("marksman.nvim", function()
 			assert.is_true(result.success)
 			assert.equals(2, vim.fn.line("."))
 			assert.equals(3, vim.fn.col("."))
+		end)
+
+		it("jumps to next mark with wrap-around", function()
+			-- open the test file and place marks on lines 1, 2, and 3
+			vim.cmd("edit " .. test_file)
+
+			vim.fn.cursor(1, 1)
+			marksman.add_mark("m1")
+
+			vim.fn.cursor(2, 1)
+			marksman.add_mark("m2")
+
+			vim.fn.cursor(3, 1)
+			marksman.add_mark("m3")
+
+			-- start at m1
+			vim.fn.cursor(1, 1)
+			local result = marksman.goto_next()
+			assert.is_true(result.success)
+			assert.equals(2, vim.fn.line("."), "Should jump from m1 to m2")
+
+			-- now at m2 -> next should be m3
+			result = marksman.goto_next()
+			assert.is_true(result.success)
+			assert.equals(3, vim.fn.line("."), "Should jump from m2 to m3")
+
+			-- now at m3 -> next should wrap back to m1
+			result = marksman.goto_next()
+			assert.is_true(result.success)
+			assert.equals(1, vim.fn.line("."), "Should wrap from m3 to m1")
+		end)
+
+		it("jumps to next mark when cursor is between marks", function()
+			vim.cmd("edit " .. test_file)
+
+			vim.fn.cursor(1, 1)
+			marksman.add_mark("m1")
+
+			vim.fn.cursor(4, 1)
+			marksman.add_mark("m2")
+
+			vim.fn.cursor(5, 1)
+			marksman.add_mark("m3")
+
+			-- cursor on line 3 → distance to m1 = 2, m2 = 1 → choose m2 as current index
+			vim.fn.cursor(3, 1)
+
+			local result = marksman.goto_next()
+			assert.is_true(result.success)
+			assert.equals(5, vim.fn.line("."), "Should jump from m2 to m3")
+		end)
+
+		it("jumps to next in another file", function()
+			-- file A
+			vim.cmd("edit " .. test_file)
+			vim.fn.cursor(1, 1)
+			marksman.add_mark("a1")
+
+			-- file B
+			vim.cmd("edit " .. test_file2)
+			vim.fn.cursor(1, 1)
+			marksman.add_mark("b1")
+			vim.fn.cursor(3, 1)
+			marksman.add_mark("b2")
+
+			vim.cmd("edit " .. test_file)
+			vim.fn.cursor(1, 1) -- at a1
+			local result = marksman.goto_next()
+
+			assert.is_true(result.success)
+			assert.equals(test_file2, vim.fn.expand("%:p"), "Should move to next mark in file2")
+			assert.equals(1, vim.fn.line("."), "Should move to b1")
+		end)
+
+		it("jumps to first mark when current file has no marks", function()
+			-- file A with marks
+			vim.cmd("edit " .. test_file)
+			vim.fn.cursor(1, 1)
+			marksman.add_mark("m1")
+			vim.fn.cursor(2, 1)
+			marksman.add_mark("m2")
+
+			-- file B with zero marks
+			vim.cmd("edit " .. test_file2)
+			vim.fn.cursor(1, 1)
+
+			local result = marksman.goto_next()
+			assert.is_true(result.success)
+			assert.equals(test_file, vim.fn.expand("%:p"))
+			assert.equals(1, vim.fn.line("."), "Should move to m1")
+		end)
+
+		it("jumps to first mark when only 1 mark exists", function()
+			-- file A with marks
+			vim.cmd("edit " .. test_file)
+			vim.fn.cursor(1, 1)
+			marksman.add_mark("m1")
+
+			-- file B with zero marks
+			vim.cmd("edit " .. test_file2)
+			vim.fn.cursor(1, 1)
+
+			local result = marksman.goto_next()
+			assert.is_true(result.success)
+
+			assert.equals(test_file, vim.fn.expand("%:p"))
+			assert.equals(1, vim.fn.line("."), "Should move to m1")
+		end)
+
+		it("returns error when no marks exist", function()
+			local result = marksman.goto_next()
+			assert.is_false(result.success)
+			assert.is_string(result.message)
+		end)
+
+		it("jumps to previous mark with wrap-around", function()
+			vim.cmd("edit " .. test_file)
+
+			vim.fn.cursor(1, 1)
+			marksman.add_mark("m1")
+
+			vim.fn.cursor(2, 1)
+			marksman.add_mark("m2")
+
+			vim.fn.cursor(3, 1)
+			marksman.add_mark("m3")
+
+			-- start at m1 -> previous should wrap to m3
+			vim.fn.cursor(1, 1)
+			local result = marksman.goto_previous()
+			assert.is_true(result.success)
+			assert.equals(3, vim.fn.line("."), "Should wrap from m1 to m3")
+
+			-- now at m3 -> previous should be m2
+			result = marksman.goto_previous()
+			assert.is_true(result.success)
+			assert.equals(2, vim.fn.line("."), "Should jump from m3 to m2")
+
+			-- now at m2 -> previous should be m1
+			result = marksman.goto_previous()
+			assert.is_true(result.success)
+			assert.equals(1, vim.fn.line("."), "Should jump from m2 to m1")
+		end)
+
+		it("jumps to last mark when current file has no marks", function()
+			-- file A with marks
+			vim.cmd("edit " .. test_file)
+			vim.fn.cursor(1, 1)
+			marksman.add_mark("m1")
+			vim.fn.cursor(2, 1)
+			marksman.add_mark("m2")
+
+			-- file B with zero marks
+			vim.cmd("edit " .. test_file2)
+			vim.fn.cursor(1, 1)
+
+			local result = marksman.goto_previous()
+			assert.is_true(result.success)
+			assert.equals(test_file, vim.fn.expand("%:p"))
+			assert.equals(2, vim.fn.line("."), "Should move to m2")
 		end)
 
 		it("deletes marks", function()
