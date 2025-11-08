@@ -36,9 +36,19 @@ local default_config = {
 	max_marks = 100,
 	search_in_ui = true,
 	silent = false,
+	-- minimal should be configured via ui opts
 	minimal = false,
 	disable_default_keymaps = false,
 	debounce_ms = 500, -- Debounce save operations
+	-- UI specific settings
+	ui = {
+		-- Position of the marks window.
+		-- "center" positions the window in the middle of the editor (default).
+		-- "top_center" aligns the window at the top of the screen, centered horizontally.
+		-- "bottom_center" aligns the window at the bottom of the screen, centered horizontally.
+		minimal = false,
+		position = "center",
+	},
 }
 
 -- Configuration validation schema
@@ -732,3 +742,4 @@ function M.setup(opts)
 end
 
 return M
+
