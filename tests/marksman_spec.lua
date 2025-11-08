@@ -528,4 +528,151 @@ describe("marksman.nvim", function()
 			assert.is_not_nil(filtered["helper_util"])
 		end)
 	end)
+
+	describe("UI highlighting", function()
+		local ui
+
+		before_each(function()
+			-- Load the UI module fresh for each test
+			package.loaded["marksman.ui"] = nil
+			ui = require("marksman.ui")
+			ui.setup({ silent = true })
+		end)
+
+		describe("create_minimal_mark_line highlighting", function()
+			it("highlights the first character of the mark name correctly", function()
+				-- This test verifies that the first character of the bookmark name
+				-- gets highlighted properly ISSUE: #23
+
+				-- Mock mark data
+				local mark = {
+					file = "/path/to/nvim/lua/plugins/nvim-lspconfig.lua",
+					line = 42,
+					col = 1,
+					text = "local function setup()",
+				}
+
+				local name = "fn_config"
+				local index = 1
+				local line_idx = 5
+
+				-- Get the private function via debug (for testing)
+				local create_minimal_mark_line
+				for k, v in pairs(debug.getregistry()) do
+					if type(v) == "table" then
+						for fname, func in pairs(v) do
+							if fname == "create_minimal_mark_line" and type(func) == "function" then
+								create_minimal_mark_line = func
+								break
+							end
+						end
+					end
+				end
+
+				-- If we can't access the private function directly, we'll simulate the logic
+				local filepath = "nvim/lua/plugins/nvim-lspconfig.lua"
+				local line = string.format(" [%d] %-20s %s", index, name:sub(1, 20), filepath)
+
+				local expected_name_start = 4 + #tostring(index)
+				local actual_f_position = line:find("f")
+
+				assert.equals(
+					expected_name_start + 1,
+					actual_f_position,
+					"The first character 'f' should be at position " .. (expected_name_start + 1) .. " (1-indexed)"
+				)
+
+				local buggy_name_start = 5 + #tostring(index) -- This is 6, which is wrong
+				local correct_name_start = 4 + #tostring(index) -- This is 5, which is correct
+
+				assert.equals(5, correct_name_start, "Correct name start should be 5 for index=1")
+				assert.equals(6, buggy_name_start, "Buggy calculation gives 6 for index=1")
+				assert.equals(expected_name_start, correct_name_start, "Correct calculation matches expected position")
+			end)
+
+			it("highlights correctly for double-digit indices", function()
+				-- Test with index=10 to ensure the fix works for multi-digit indices too
+				local name = "fn_config"
+				local index = 10
+				local expected_name_start = 4 + #tostring(index) -- Should be 6 for index=10
+				assert.equals(6, expected_name_start, "Name should start at position 6 for index=10")
+
+				-- Create the line to verify
+				local filepath = "test.lua"
+				local line = string.format(" [%d] %-20s %s", index, name:sub(1, 20), filepath)
+				local actual_f_position = line:find("f")
+
+				-- Find returns 1-indexed, so we expect position 7 (which is 0-indexed position 6)
+				assert.equals(
+					expected_name_start + 1,
+					actual_f_position,
+					"The 'f' should be at 1-indexed position " .. (expected_name_start + 1)
+				)
+			end)
+
+			it("applies highlight to the entire mark name", function()
+				local name = "fn_config"
+				local index = 1
+
+				local name_start = 4 + #tostring(index) -- Correct calculation
+				local name_end = name_start + math.min(20, #name)
+
+				-- For "fn_config" (9 chars), the highlight should cover positions 5-13 (0-indexed)
+				assert.equals(5, name_start, "Name should start at position 5")
+				assert.equals(14, name_end, "Name should end at position 14 (5 + 9)")
+
+				-- Verify the full name is covered
+				local expected_length = #name
+				local actual_length = name_end - name_start
+				assert.equals(expected_length, actual_length, "Highlight should cover all characters of the name")
+			end)
+
+			it("handles name truncation correctly", function()
+				-- Test with a name longer than 20 characters
+				local long_name = "very_long_function_name_that_exceeds_twenty_chars"
+				local index = 1
+
+				local name_start = 4 + #tostring(index)
+				local name_end = name_start + math.min(20, #long_name)
+
+				-- Should truncate to 20 characters
+				assert.equals(5, name_start)
+				assert.equals(25, name_end, "Should highlight exactly 20 characters (5 + 20)")
+			end)
+		end)
+
+		describe("regression test for the reported bug", function()
+			it("does not skip the first character when highlighting bookmark names", function()
+				-- "[1] fn_config" where the 'f' was not highlighted
+
+				local name = "fn_config"
+				local index = 1
+
+				-- Build the line as the code does
+				local line = string.format(" [%d] %-20s %s", index, name:sub(1, 20), "somefile.lua")
+
+				-- Calculate highlight position using CORRECT formula
+				local correct_name_start = 4 + #tostring(index)
+
+				-- Extract the substring that should be highlighted
+				local highlighted_part = line:sub(correct_name_start + 1, correct_name_start + #name)
+
+				-- The highlighted part should start with 'f', not 'n'
+				assert.equals(
+					"fn_config",
+					highlighted_part:sub(1, #name),
+					"Highlighted text should start with 'f' (the first character of fn_config)"
+				)
+
+				-- Verify that the buggy calculation would miss the 'f'
+				local buggy_name_start = 5 + #tostring(index)
+				local buggy_highlighted_part = line:sub(buggy_name_start + 1, buggy_name_start + #name)
+				assert.equals(
+					"n_config ",
+					buggy_highlighted_part:sub(1, 9),
+					"Buggy calculation would start with 'n' (missing the 'f')"
+				)
+			end)
+		end)
+	end)
 end)

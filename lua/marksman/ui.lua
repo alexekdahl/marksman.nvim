@@ -172,7 +172,7 @@ local function create_minimal_mark_line(name, mark, index, line_idx)
 	})
 
 	-- Name highlight
-	local name_start = 5 + #tostring(index)
+	local name_start = 4 + #tostring(index)
 	local name_end = name_start + math.min(20, #name)
 	table.insert(highlights, {
 		line = line_idx,
