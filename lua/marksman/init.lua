@@ -34,19 +34,15 @@ local default_config = {
 	},
 	auto_save = true,
 	max_marks = 100,
-	search_in_ui = true,
 	silent = false,
-	-- minimal should be configured via ui opts
 	minimal = false,
 	disable_default_keymaps = false,
 	debounce_ms = 500, -- Debounce save operations
-	-- UI specific settings
 	ui = {
 		-- Position of the marks window.
 		-- "center" positions the window in the middle of the editor (default).
 		-- "top_center" aligns the window at the top of the screen, centered horizontally.
 		-- "bottom_center" aligns the window at the bottom of the screen, centered horizontally.
-		minimal = false,
 		position = "center",
 	},
 }
@@ -55,11 +51,19 @@ local default_config = {
 local config_schema = {
 	auto_save = { type = "boolean" },
 	max_marks = { type = "number", min = 1, max = 1000 },
-	search_in_ui = { type = "boolean" },
 	silent = { type = "boolean" },
 	minimal = { type = "boolean" },
 	disable_default_keymaps = { type = "boolean" },
 	debounce_ms = { type = "number", min = 100, max = 5000 },
+	ui = {
+		type = "table",
+		fields = {
+			position = {
+				type = "string",
+				allowed = { "center", "top_center", "bottom_center" },
+			},
+		},
+	},
 }
 
 local config = {}
@@ -742,4 +746,3 @@ function M.setup(opts)
 end
 
 return M
-
