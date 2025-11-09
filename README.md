@@ -61,6 +61,9 @@ Vim's built-in marks are great, but they're global and get messy fast. Marksman 
     silent = false,
     disable_default_keymaps = false,
     debounce_ms = 500,
+    ui = {
+      position = "center",  -- "center", "top_center", or "bottom_center"
+    },
   },
 }
 ```
@@ -129,6 +132,9 @@ require("marksman").setup({
   silent = false,            -- Suppress notifications
   disable_default_keymaps = false,
   debounce_ms = 500,         -- Save debounce (100-5000ms)
+  ui = {
+    position = "center",     -- Window position: "center", "top_center", or "bottom_center"
+  },
   highlights = {
     ProjectMarksTitle = { fg = "#61AFEF", bold = true },
     ProjectMarksNumber = { fg = "#C678DD" },
