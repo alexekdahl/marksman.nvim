@@ -624,8 +624,43 @@ function M.show_marks_window(marks, project_name, search_query)
 		pcall(vim.api.nvim_buf_add_highlight, buf, -1, hl.hl_group, hl.line, hl.col, hl.end_col)
 	end
 
-	-- Calculate window position (centered)
-	local row = math.floor((vim.o.lines - WINDOW_HEIGHT) / 2)
+	-- Calculate window position based on user configuration.  By default the
+	-- marks window is centered in the editor, but users can override
+	-- this by specifying ui.position in their plugin configuration.  A
+	-- value of "top_center" positions the window near the top of the
+	-- screen, while "bottom_center" aligns it near the bottom.  Any
+	-- unrecognised value falls back to the centered position.  We also
+	-- clamp the row so the window never renders outside the visible
+	-- editor lines.  Note: vim.o.lines returns the total number of
+	-- lines in the UI (not just the buffer), so subtracting the window
+	-- height ensures the window is fully on screen.
+	local pos = nil
+	if config and type(config.ui) == "table" then
+		pos = config.ui.position
+	end
+	local row
+	if pos == "top_center" then
+		-- Place the window a couple of lines down to avoid
+		-- overlapping the very top of the UI.  A value of 1 gives
+		-- a small margin but still keeps the window anchored near
+		-- the top.
+		row = 1
+	elseif pos == "bottom_center" then
+		-- Place the window a couple of lines above the bottom to
+		-- leave room for command line and status line.  We subtract
+		-- 2 to account for the border and padding.
+		row = vim.o.lines - WINDOW_HEIGHT - 2
+	else
+		-- Default to center positioning
+		row = math.floor((vim.o.lines - WINDOW_HEIGHT) / 2)
+	end
+	-- Ensure row stays within valid bounds
+	if row < 0 then
+		row = 0
+	elseif row > vim.o.lines - WINDOW_HEIGHT then
+		row = math.max(vim.o.lines - WINDOW_HEIGHT, 0)
+	end
+	-- Always center horizontally
 	local col = math.floor((vim.o.columns - WINDOW_WIDTH) / 2)
 
 	-- Window title
@@ -701,3 +736,4 @@ function M.cleanup()
 end
 
 return M
+
