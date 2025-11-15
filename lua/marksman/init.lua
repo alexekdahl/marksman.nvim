@@ -31,19 +31,31 @@ local default_config = {
 		ProjectMarksHelp = { fg = "#61AFEF" },
 		ProjectMarksBorder = { fg = "#5A5F8C" },
 		ProjectMarksSearch = { fg = "#E5C07B" },
+		ProjectMarksSeparator = { fg = "#3E4451" },
+		ProjectMarksSign = { fg = "#61AFEF" },
 	},
 	auto_save = true,
 	max_marks = 100,
 	silent = false,
 	minimal = false,
 	disable_default_keymaps = false,
-	debounce_ms = 500, -- Debounce save operations
+	debounce_ms = 100, -- Debounce save operations
 	ui = {
 		-- Position of the marks window.
 		-- "center" positions the window in the middle of the editor (default).
 		-- "top_center" aligns the window at the top of the screen, centered horizontally.
 		-- "bottom_center" aligns the window at the bottom of the screen, centered horizontally.
 		position = "center",
+	},
+
+	-- Sign column settings for displaying marks in the left gutter. When
+	-- `enabled` is true, Marksman will place a sign next to each mark in
+	-- its associated buffer. Users can customize the text displayed in
+	-- the sign column (`text`) and the sign priority (`priority`).
+	sign = {
+		enabled = false,
+		text = "●",
+		priority = 50,
 	},
 }
 
@@ -54,7 +66,7 @@ local config_schema = {
 	silent = { type = "boolean" },
 	minimal = { type = "boolean" },
 	disable_default_keymaps = { type = "boolean" },
-	debounce_ms = { type = "number", min = 100, max = 5000 },
+	debounce_ms = { type = "number", min = 50, max = 5000 },
 	ui = {
 		type = "table",
 		fields = {
@@ -64,12 +76,24 @@ local config_schema = {
 			},
 		},
 	},
+
+	sign = {
+		type = "table",
+		fields = {
+			enabled = { type = "boolean" },
+			text = { type = "string" },
+			priority = { type = "number" },
+		},
+	},
 }
 
 local config = {}
 
 -- Debounced save timer
 local save_timer = nil
+
+-- Forward declaration for sign updates (defined below)
+local update_signs
 
 ---Helper function for conditional notifications
 ---@param message string The notification message
@@ -105,6 +129,27 @@ local function validate_config(user_config, schema)
 					string.format("Config value %s above maximum: %s > %s", key, value, rule.max),
 					vim.log.levels.WARN
 				)
+			elseif rule.allowed then
+				local allowed = false
+				for _, v in ipairs(rule.allowed) do
+					if value == v then
+						allowed = true
+						break
+					end
+				end
+				if not allowed then
+					notify(
+						string.format(
+							"Invalid value for %s: %s (allowed: %s)",
+							key,
+							value,
+							table.concat(rule.allowed, ", ")
+						),
+						vim.log.levels.WARN
+					)
+				else
+					validated[key] = value
+				end
 			else
 				validated[key] = value
 			end
@@ -175,6 +220,53 @@ local function debounced_save()
 	end, config.debounce_ms or 500)
 end
 
+---Define and place sign indicators for marksman marks. This function clears
+---existing signs in the "marksman" group and places a sign at each mark
+---location in its loaded buffer. It respects the user's sign configuration
+---(enabled, text, highlight, priority). Called internally after mark
+---mutations and on relevant autocommands.
+update_signs = function()
+	-- Only proceed if sign column support is enabled
+	if not config.sign or not config.sign.enabled then
+		return
+	end
+	-- Define the sign used for marksman marks. Use pcall to handle
+	-- environments where sign definitions may already exist.
+	local sign_name = "MarksmanSign"
+	local ok_define = pcall(vim.fn.sign_define, sign_name, {
+		text = config.sign.text or "●",
+		texthl = "ProjectMarksSign",
+		linehl = "",
+		numhl = "",
+	})
+	-- Clear any previously placed signs in the marksman group
+	pcall(vim.fn.sign_unplace, "marksman", { buffer = "*" })
+	vim.api.nvim_exec2("redraw!", {})
+	-- Fetch marks
+	local storage_module = get_storage()
+	if not storage_module then
+		return
+	end
+	local marks = storage_module.get_marks()
+	local id = 1
+	for _, mark in pairs(marks) do
+		-- Place sign only if buffer is loaded
+		local bufnr = vim.fn.bufnr(mark.file, false)
+		if bufnr ~= -1 and vim.api.nvim_buf_is_loaded(bufnr) then
+			pcall(vim.fn.sign_place, id, "marksman", sign_name, bufnr, {
+				lnum = mark.line,
+				priority = config.sign.priority or 10,
+			})
+			id = id + 1
+		end
+	end
+end
+
+-- Expose update_signs so tests and users can trigger sign updates manually
+M.update_signs = function()
+	update_signs()
+end
+
 ---Add a mark at the current cursor position
 ---@param name string? Optional mark name (auto-generated if nil)
 ---@param description string? Optional mark description
@@ -235,6 +327,8 @@ function M.add_mark(name, description)
 	local success = storage_module.add_mark(name, mark)
 	if success then
 		debounced_save()
+		-- Update signs after successfully adding a mark
+		update_signs()
 		notify("󰃀 Mark added: " .. name, vim.log.levels.INFO)
 		return { success = true, message = "Mark added successfully", mark_name = name }
 	else
@@ -408,6 +502,8 @@ function M.delete_mark(name)
 	local success = storage_module.delete_mark(name)
 	if success then
 		debounced_save()
+		-- Update signs after deleting a mark
+		update_signs()
 		notify("󰃀 Mark deleted: " .. name, vim.log.levels.INFO)
 		return { success = true, message = "Mark deleted successfully", mark_name = name }
 	else
@@ -436,6 +532,8 @@ function M.rename_mark(old_name, new_name)
 	local success = storage_module.rename_mark(old_name, new_name)
 	if success then
 		debounced_save()
+		-- Update signs after renaming a mark
+		update_signs()
 		notify("󰃀 Mark renamed: " .. old_name .. " → " .. new_name, vim.log.levels.INFO)
 		return { success = true, message = "Mark renamed successfully", old_name = old_name, new_name = new_name }
 	else
@@ -460,6 +558,8 @@ function M.move_mark(name, direction)
 	local success = storage_module.move_mark(name, direction)
 	if success then
 		debounced_save()
+		-- Re-apply signs after moving mark order (even if line doesn't change)
+		update_signs()
 		notify("󰃀 Mark moved " .. direction, vim.log.levels.INFO)
 		return { success = true, message = "Mark moved successfully", direction = direction }
 	else
@@ -544,6 +644,8 @@ function M.clear_all_marks()
 			if storage_module then
 				storage_module.clear_all_marks()
 				debounced_save()
+				-- Remove all signs after clearing marks
+				update_signs()
 				notify("󰃀 All marks cleared", vim.log.levels.INFO)
 			end
 		end
@@ -743,6 +845,22 @@ function M.setup(opts)
 		callback = M.cleanup,
 		desc = "Cleanup marksman resources",
 	})
+
+	-- If sign column support is enabled, place initial signs and set up autocommands
+	if config.sign and config.sign.enabled then
+		-- Place signs for marks that already exist
+		pcall(update_signs)
+		-- Update signs whenever a buffer is read or entered (marks in that file may need signs)
+		vim.api.nvim_create_autocmd({ "BufReadPost", "BufWinEnter" }, {
+			callback = function()
+				-- Delay slightly to ensure buffer is loaded
+				vim.schedule(function()
+					pcall(update_signs)
+				end)
+			end,
+			desc = "Update marksman signs when entering a buffer",
+		})
+	end
 end
 
 return M

@@ -73,6 +73,9 @@ local function setup_highlights()
 		ProjectMarksBorder = { fg = "#5A5F8C" },
 		ProjectMarksSearch = { fg = "#E5C07B" },
 		ProjectMarksSeparator = { fg = "#3E4451" }, -- For separator line
+		-- Highlight for the sign indicator shown next to marks from the current file.
+		-- This colour defaults to the same as the title but can be overridden in the user's config.
+		ProjectMarksSign = { fg = "#61AFEF" },
 	}
 
 	-- Merge with user config
@@ -314,6 +317,9 @@ local function create_marks_content(marks, search_query)
 	local footer_height = 2 -- Separator + help line
 	local available_height = WINDOW_HEIGHT - header_height - footer_height - 2
 
+	-- Determine current file (absolute path) to mark entries belonging to the active buffer
+	local current_file = vim.fn.expand("%:p")
+
 	-- Handle no marks case
 	if shown_marks == 0 then
 		local no_marks_line = search_query and search_query ~= "" and " No marks found matching search"
@@ -342,6 +348,25 @@ local function create_marks_content(marks, search_query)
 				local line_idx = current_line + marks_added
 				local line, line_highlights = create_minimal_mark_line(name, mark, i, line_idx)
 
+				-- Determine if this mark is in the current file
+				if mark.file == current_file then
+					-- Replace leading space with sign indicator
+					line = config.sign.text .. " " .. line:sub(2)
+					for _, hl in ipairs(line_highlights) do
+						hl.col = hl.col + 1
+						if hl.end_col ~= -1 then
+							hl.end_col = hl.end_col + 1
+						end
+					end
+					-- Add highlight for the sign indicator
+					table.insert(highlights, {
+						line = line_idx,
+						col = 0,
+						end_col = 1,
+						hl_group = "ProjectMarksSign",
+					})
+				end
+
 				table.insert(lines, line)
 				mark_info[line_idx] = { name = name, mark = mark, index = i }
 
@@ -362,10 +387,22 @@ local function create_marks_content(marks, search_query)
 				local start_line_idx = current_line + marks_added
 				local mark_lines, mark_highlights = create_detailed_mark_lines(name, mark, i, start_line_idx)
 
+				-- If mark is in current file, decorate the first line with a sign indicator
+				if mark.file == current_file then
+					mark_lines[1] = config.sign.text .. mark_lines[1]:sub(2)
+					-- Insert highlight for sign indicator
+					table.insert(highlights, {
+						line = start_line_idx,
+						col = 0,
+						end_col = 1,
+						hl_group = "ProjectMarksSign",
+					})
+				end
+
 				mark_info[start_line_idx] = { name = name, mark = mark, index = i }
 
-				for _, line in ipairs(mark_lines) do
-					table.insert(lines, line)
+				for _, line_content in ipairs(mark_lines) do
+					table.insert(lines, line_content)
 				end
 				for _, hl in ipairs(mark_highlights) do
 					table.insert(highlights, hl)
@@ -736,4 +773,3 @@ function M.cleanup()
 end
 
 return M
-
