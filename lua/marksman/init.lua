@@ -31,6 +31,9 @@ local default_config = {
 		ProjectMarksHelp = { fg = "#61AFEF" },
 		ProjectMarksBorder = { fg = "#5A5F8C" },
 		ProjectMarksSearch = { fg = "#E5C07B" },
+		ProjectMarksSeparator = { fg = "#3E4451" },
+		-- Highlight group for the sign indicator used in the marks UI.
+		ProjectMarksSign = { fg = "#61AFEF" },
 	},
 	auto_save = true,
 	max_marks = 100,
@@ -105,6 +108,27 @@ local function validate_config(user_config, schema)
 					string.format("Config value %s above maximum: %s > %s", key, value, rule.max),
 					vim.log.levels.WARN
 				)
+			elseif rule.allowed then
+				local allowed = false
+				for _, v in ipairs(rule.allowed) do
+					if value == v then
+						allowed = true
+						break
+					end
+				end
+				if not allowed then
+					notify(
+						string.format(
+							"Invalid value for %s: %s (allowed: %s)",
+							key,
+							value,
+							table.concat(rule.allowed, ", ")
+						),
+						vim.log.levels.WARN
+					)
+				else
+					validated[key] = value
+				end
 			else
 				validated[key] = value
 			end
