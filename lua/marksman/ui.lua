@@ -351,7 +351,13 @@ local function create_marks_content(marks, search_query)
 				-- Determine if this mark is in the current file
 				if mark.file == current_file then
 					-- Replace leading space with sign indicator
-					line = "●" .. line:sub(2)
+					line = config.sign.text .. " " .. line:sub(2)
+					for _, hl in ipairs(line_highlights) do
+						hl.col = hl.col + 1
+						if hl.end_col ~= -1 then
+							hl.end_col = hl.end_col + 1
+						end
+					end
 					-- Add highlight for the sign indicator
 					table.insert(highlights, {
 						line = line_idx,
@@ -383,8 +389,7 @@ local function create_marks_content(marks, search_query)
 
 				-- If mark is in current file, decorate the first line with a sign indicator
 				if mark.file == current_file then
-					-- Replace leading space with sign indicator on the main line
-					mark_lines[1] = "●" .. mark_lines[1]:sub(2)
+					mark_lines[1] = config.sign.text .. mark_lines[1]:sub(2)
 					-- Insert highlight for sign indicator
 					table.insert(highlights, {
 						line = start_line_idx,
